@@ -20,7 +20,14 @@ npm run preview
 - Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, opening, scroll reveal, filter refresh, and detail dialog animation.
 - Academia/Classical visual system based on dark wood, parchment, brass, crimson wax seals, arch-top covers, and sepia-to-color image treatment.
-- No backend, login, upload flow, database, production deployment, or secret handling.
+- No backend, login, upload flow, database, or secret handling. Production deployment is GitHub Pages.
+
+## Remote And Deployment
+
+- GitHub repository: https://github.com/mrx-data/mxren-museum
+- GitHub Pages site: https://mrx-data.github.io/mxren-museum/
+- Deployment workflow: `.github/workflows/deploy-pages.yml`
+- Deployment trigger: pushes to `main`
 
 ## Project Structure
 
@@ -33,6 +40,7 @@ npm run preview
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
 | `public/artifacts/` | Generated local PNG placeholder covers and detail images |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
+| `.github/workflows/deploy-pages.yml` | GitHub Pages deployment workflow |
 | `docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md` | Design spec |
 | `docs/superpowers/specs/2026-07-02-museum-motion-system-design.md` | Motion design spec |
 | `docs/superpowers/plans/2026-07-02-museum-motion-system.md` | Motion implementation plan |

@@ -9,10 +9,13 @@
 - Tech stack: Vite 8.1.3, TypeScript, HTML, CSS, GSAP 3.15.0, Node.js validation script
 - Package manager: npm with `package-lock.json`
 - Asset mode: generated local PNG placeholders under `public/artifacts`
+- GitHub repository: `https://github.com/mrx-data/mxren-museum`
+- Production site: `https://mrx-data.github.io/mxren-museum/`
+- Deployment mode: GitHub Pages through `.github/workflows/deploy-pages.yml`
 - Echo Link KB project entry: `/Users/echo/Documents/obsidian-data/echo-link-kb/wiki/projects/mxren-museum/项目首页.md`
 - Codebase index: `/Users/echo/Documents/obsidian-data/echo-link-kb/sources/code/codebase-index.md`
 
-The first version is intentionally frontend-only. It uses local sample artifact data and does not include a backend, login, upload flow, database, cloud storage, or production deployment.
+The first version is intentionally frontend-only. It uses local sample artifact data and does not include a backend, login, upload flow, database, or cloud storage. Production deployment is GitHub Pages.
 
 ## Commands
 
@@ -25,6 +28,7 @@ The first version is intentionally frontend-only. It uses local sample artifact 
 | Typecheck | `npm run typecheck` | Runs `tsc --noEmit` |
 | Build | `npm run build` | Runs lint, typecheck, and Vite production build |
 | Dependency audit | `npm audit --audit-level=moderate` | Checks moderate-or-higher dependency vulnerabilities |
+| Deploy | `git push origin main` | Triggers GitHub Pages workflow after local checks pass |
 
 ## Environment Variables
 
@@ -43,6 +47,7 @@ Rules:
 - `src/main.ts` renders featured artifacts, filters, collection cards, counts, local PNG cover images, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, opening timeline, scroll reveal, filter refresh, wax-seal loop, desktop-light parallax, and dialog open/close animation.
 - `src/styles.css` owns the Academia/Classical design system: dark mahogany, aged oak, parchment text, polished brass interactions, crimson wax seals, arch-top covers, sepia-to-color transitions, paper texture, vignette, ornate dividers, and responsive layout.
+- `.github/workflows/deploy-pages.yml` runs `npm ci`, `npm run build`, uploads `dist`, and deploys to GitHub Pages.
 - `public/artifacts/` contains 36 generated local PNG placeholder assets: 1 cover and 3 detail images for each of the 9 sample artifacts.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.
 - The current images are generated placeholders, not user-provided final素材. When real images are added, preserve alt text, arch-top treatment, and the sepia-to-color interaction.
@@ -88,6 +93,7 @@ Minimum browser checks:
 - Artifact detail dialog opens and closes with Escape.
 - Artifact detail dialog includes cover, ledger metadata, introduction, a three-image strip with loaded local PNGs, and visible motion-ledger items.
 - 390px mobile viewport has no horizontal overflow.
+- Production URL returns HTTP 200, and deployed JS/CSS/PNG assets return HTTP 200.
 
 ## Knowledge Write-Back
 
