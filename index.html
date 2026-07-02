@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="mxren-museum 是一个用于收藏游戏、风景与个人作品的私人数字藏馆。"
+    />
+    <title>mxren-museum | 私人数字藏馆</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:wght@400;500;600&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body data-motion-root>
+    <div class="paper-texture" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="museum-atmosphere" data-motion-ambient aria-hidden="true"></div>
+
+    <div id="app" class="museum-shell">
+      <header class="site-header" data-motion-section>
+        <a class="brand-mark" href="#top" aria-label="mxren-museum 首页">
+          <span class="brand-sigil" aria-hidden="true">M</span>
+          <span>
+            <strong>mxren-museum</strong>
+            <small>私人数字藏馆</small>
+          </span>
+        </a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="#featured">精选藏品</a>
+          <a href="#collection">馆藏目录</a>
+          <a href="#notes">策展原则</a>
+        </nav>
+      </header>
+
+      <main>
+        <section id="top" class="hero-section corner-flourish-large" aria-labelledby="hero-title" data-motion-hero>
+          <div class="hero-copy">
+            <p class="volume-label">Volume I</p>
+            <h1 id="hero-title" data-motion-title>私人数字藏馆</h1>
+            <p class="drop-cap hero-lede">
+              这里收藏那些只属于个人记忆的数字标本：一段游戏旅程，一束风景光线，一件亲手完成的作品。每件藏品都有封面、图像、来历和被留下的理由。
+            </p>
+            <div class="hero-actions" aria-label="主要操作">
+              <a class="button button-primary" href="#collection">进入馆藏</a>
+              <a class="button button-secondary" href="#featured">查看精选</a>
+            </div>
+          </div>
+
+          <aside class="hero-cabinet" aria-label="藏馆摘要">
+            <div class="cabinet-plate arch-top sepia-reveal" role="img" aria-label="私人数字藏馆精选封面" data-motion-image>
+              <span class="cover-symbol" aria-hidden="true">✶</span>
+            </div>
+            <dl class="museum-stats">
+              <div>
+                <dt>Artifacts</dt>
+                <dd id="artifact-count">0</dd>
+              </div>
+              <div>
+                <dt>Categories</dt>
+                <dd id="category-count">0</dd>
+              </div>
+              <div>
+                <dt>Mode</dt>
+                <dd>Static</dd>
+              </div>
+            </dl>
+          </aside>
+        </section>
+
+        <div class="ornate-divider" aria-hidden="true"></div>
+
+        <section id="featured" class="section-block" aria-labelledby="featured-title" data-motion-section>
+          <div class="section-heading">
+            <p class="volume-label">Volume II</p>
+            <h2 id="featured-title" data-motion-title>精选藏品</h2>
+            <p>
+              被蜡封标记的藏品，是这间私人藏馆的第一批馆藏核心：它们不是最贵，而是最能解释这个人如何看世界。
+            </p>
+          </div>
+          <div id="featured-gallery" class="featured-grid" aria-live="polite"></div>
+        </section>
+
+        <div class="ornate-divider" aria-hidden="true"></div>
+
+        <section id="collection" class="section-block" aria-labelledby="collection-title" data-motion-section>
+          <div class="section-heading">
+            <p class="volume-label">Volume III</p>
+            <h2 id="collection-title" data-motion-title>馆藏目录</h2>
+            <p>按藏品类型浏览，每张封面都像一张旧照片，等待在触碰时恢复它原本的色彩。</p>
+          </div>
+          <div id="filter-bar" class="filter-bar" aria-label="按类别筛选藏品"></div>
+          <div id="collection-grid" class="collection-grid" aria-live="polite"></div>
+        </section>
+
+        <div class="ornate-divider" aria-hidden="true"></div>
+
+        <section id="notes" class="curator-notes corner-flourish" aria-labelledby="notes-title" data-motion-section>
+          <div>
+            <p class="volume-label">Volume IV</p>
+            <h2 id="notes-title" data-motion-title>策展原则</h2>
+          </div>
+          <div class="note-ledger">
+            <p class="drop-cap">
+              藏品不是文件列表，而是记忆的秩序。后续每次新增真实藏品，都应补齐封面、图像、介绍、分类、年份、媒介和一句“为什么值得留下”。
+            </p>
+            <ul>
+              <li><span>I</span> 保留作品和体验的来历，不只展示结果。</li>
+              <li><span>II</span> 给每件藏品稳定编号，方便未来搜索、筛选和分享。</li>
+              <li><span>III</span> 先保证封面和说明质量，再扩展后台和上传流程。</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>mxren-museum</span>
+        <span>Digital collection ledger, first edition.</span>
+      </footer>
+
+      <dialog id="artifact-dialog" class="artifact-dialog" aria-labelledby="dialog-title" data-motion-dialog>
+        <button class="dialog-close" type="button" aria-label="关闭藏品详情">×</button>
+        <div id="dialog-body"></div>
+      </dialog>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
