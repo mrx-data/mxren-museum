@@ -113,7 +113,7 @@ function initSectionTimeline(section: HTMLElement, index: number) {
       start: "top 78%",
       once: true
     },
-    defaults: { ease: "power3.out" }
+    defaults: { ease: "power3.out", immediateRender: false }
   });
 
   if (heading) {
@@ -145,6 +145,7 @@ function initDividerTimelines() {
         scaleX: 1,
         duration: 1.1,
         ease: "power3.out",
+        immediateRender: false,
         scrollTrigger: {
           id: `museum-divider-${index}`,
           trigger: divider,
