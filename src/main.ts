@@ -39,6 +39,7 @@ let localArtifacts: ManagedArtifact[] = loadLocalArtifacts();
 let editingArtifactId: string | null = null;
 let pendingCoverImage = "";
 let pendingGalleryImages: GalleryImageInput[] = [];
+const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
 const artifactCount = document.querySelector<HTMLElement>("#artifact-count");
 const categoryCount = document.querySelector<HTMLElement>("#category-count");
@@ -95,11 +96,20 @@ function setCoverStyle(element: HTMLElement, artifact: Artifact) {
 
 function createImageElement(src: string, alt: string) {
   const image = document.createElement("img");
-  image.src = src;
+  image.src = resolveAssetSrc(src);
   image.alt = alt;
   image.loading = "lazy";
   image.decoding = "async";
   return image;
+}
+
+function resolveAssetSrc(src: string) {
+  const trimmedSrc = src.trim();
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(trimmedSrc) || !trimmedSrc.startsWith("/")) {
+    return src;
+  }
+
+  return `${basePath}${trimmedSrc.replace(/^\/+/, "")}`;
 }
 
 function isArtifactCategory(value: string): value is ArtifactCategory {

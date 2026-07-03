@@ -133,6 +133,8 @@ imagePaths.forEach((imagePath) => {
 });
 
 assert(main.includes("createImageElement"), "Missing image element rendering helper");
+assert(main.includes("resolveAssetSrc"), "Missing asset base path resolver");
+assert(main.includes("BASE_URL"), "Image assets must respect Vite base URL for GitHub Pages");
 assert(main.includes("artifact.coverImage"), "Artifact cover image is not rendered from data");
 assert(main.includes("artifact.galleryImages"), "Artifact gallery images are not rendered from data");
 assert(css.includes(".artifact-cover img"), "Missing artifact cover image styling");
