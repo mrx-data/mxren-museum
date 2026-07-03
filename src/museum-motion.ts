@@ -27,10 +27,18 @@ function killMuseumScrollTriggers() {
 }
 
 function revealAllMotionElements() {
-  gsap.set("[data-motion-title], [data-motion-item], [data-motion-image], [data-motion-ledger]", {
+  gsap.set("[data-motion-title], [data-motion-item], [data-motion-image], [data-motion-ledger], .section-heading, .note-ledger", {
     autoAlpha: 1,
     clearProps: "transform,clipPath,filter"
   });
+}
+
+function resetMotionElements() {
+  motionElements<HTMLElement>(".motion-reveal, [data-motion-title], [data-motion-item], [data-motion-image], [data-motion-ledger], .section-heading, .note-ledger").forEach((element) => {
+    element.classList.remove("motion-reveal");
+  });
+
+  revealAllMotionElements();
 }
 
 function initAmbientMotion() {
@@ -83,10 +91,10 @@ function initOpeningTimeline() {
   gsap.timeline({ defaults: { ease: "power3.out" } })
     .from(headerItems, { autoAlpha: 0, y: -12, duration: 0.7, stagger: 0.08 })
     .from(volume, { autoAlpha: 0, y: 14, duration: 0.48 }, "-=0.28")
-    .from(title, { autoAlpha: 0, y: 44, clipPath: "inset(0 0 100% 0)", duration: 0.9 }, "-=0.2")
-    .from(lede, { autoAlpha: 0, y: 22, duration: 0.72 }, "-=0.48")
-    .from(actions, { autoAlpha: 0, y: 18, duration: 0.62 }, "-=0.5")
-    .from(cabinet, { autoAlpha: 0, y: 30, scale: 0.985, filter: "blur(6px)", duration: 0.92 }, "-=0.58");
+    .from(title, { autoAlpha: 0, y: 28, filter: "blur(4px)", duration: 0.72 }, "-=0.2")
+    .from(lede, { autoAlpha: 0, y: 20, duration: 0.62 }, "-=0.42")
+    .from(actions, { autoAlpha: 0, y: 16, duration: 0.54 }, "-=0.42")
+    .from(cabinet, { autoAlpha: 0, y: 24, scale: 0.985, filter: "blur(5px)", duration: 0.72 }, "-=0.48");
 }
 
 function initWaxSealMotion() {
@@ -179,9 +187,9 @@ function initDesktopParallax() {
 
 export function refreshMuseumScrollAnimations() {
   killMuseumScrollTriggers();
+  resetMotionElements();
 
   if (shouldReduceMotion()) {
-    revealAllMotionElements();
     return;
   }
 

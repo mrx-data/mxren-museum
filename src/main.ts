@@ -42,7 +42,10 @@ let pendingGalleryImages: GalleryImageInput[] = [];
 
 const artifactCount = document.querySelector<HTMLElement>("#artifact-count");
 const categoryCount = document.querySelector<HTMLElement>("#category-count");
+const heroStageGallery = document.querySelector<HTMLElement>("#hero-stage-gallery");
+const heroStageCaption = document.querySelector<HTMLElement>("#hero-stage-caption");
 const featuredGallery = document.querySelector<HTMLElement>("#featured-gallery");
+const categoryIndex = document.querySelector<HTMLElement>("#category-index");
 const filterBar = document.querySelector<HTMLElement>("#filter-bar");
 const collectionGrid = document.querySelector<HTMLElement>("#collection-grid");
 const dialog = document.querySelector<HTMLDialogElement>("#artifact-dialog");
@@ -161,6 +164,11 @@ function allArtifacts() {
   return [...sampleArtifacts, ...localArtifacts];
 }
 
+function artifactNumber(artifact: Artifact) {
+  const index = allArtifacts().findIndex((item) => item.id === artifact.id);
+  return `No.${String(Math.max(index, 0) + 1).padStart(3, "0")}`;
+}
+
 function persistLocalArtifacts() {
   saveLocalArtifacts(localArtifacts);
 }
@@ -173,7 +181,9 @@ function showManagerStatus(message: string, tone: "neutral" | "success" | "dange
 
 function refreshMuseumView() {
   updateCounts();
+  renderHeroStage();
   renderFeatured();
+  renderCategoryIndex();
   renderFilters();
   renderCollection();
   renderManagerList();
@@ -189,7 +199,7 @@ function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
 
 function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
   const article = document.createElement("article");
-  article.className = `artifact-card corner-flourish ${variant === "featured" ? "is-featured" : ""}`;
+  article.className = `artifact-card poster-work corner-flourish ${variant === "featured" ? "is-featured" : ""}`;
   article.setAttribute("data-motion-item", variant);
 
   const button = document.createElement("button");
@@ -209,10 +219,18 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
   const body = document.createElement("div");
   body.className = "artifact-body";
   body.innerHTML = `
+    <div class="poster-card-topline">
+      <span>${escapeHtml(artifactNumber(artifact))}</span>
+      <span>细赏</span>
+    </div>
     <p class="artifact-volume">Volume ${escapeHtml(artifact.volume)}</p>
     <h3>${escapeHtml(artifact.title)}</h3>
     <p class="artifact-meta">${escapeHtml(artifact.categoryLabel)} · ${escapeHtml(artifact.year)}</p>
     <p>${escapeHtml(artifact.summary)}</p>
+    <dl class="poster-specs">
+      <div><dt>媒介</dt><dd>${escapeHtml(artifact.medium)}</dd></div>
+      <div><dt>标记</dt><dd>${escapeHtml(artifact.rarity)}</dd></div>
+    </dl>
   `;
 
   if (artifact.featured) {
@@ -226,6 +244,69 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
   button.append(cover, body);
   article.append(button);
   return article;
+}
+
+function renderHeroStage() {
+  if (!heroStageGallery || !heroStageCaption) return;
+
+  const stagedArtifacts = allArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
+  if (stagedArtifacts.length === 0) return;
+
+  heroStageGallery.replaceChildren(
+    ...stagedArtifacts.map((artifact, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `stage-card ${index === 0 ? "is-front" : ""}`;
+      button.setAttribute("aria-label", `打开 ${artifact.title} 的藏品详情`);
+      button.style.setProperty("--stage-index", String(index));
+      setCoverStyle(button, artifact);
+      button.addEventListener("click", () => openArtifactDialog(artifact));
+
+      if (artifact.coverImage) {
+        button.append(createImageElement(artifact.coverImage, artifact.coverAlt));
+      }
+      button.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
+      return button;
+    })
+  );
+
+  const lead = stagedArtifacts[0];
+  heroStageCaption.innerHTML = `
+    <span>展厅 ${escapeHtml(String(stagedArtifacts.length).padStart(2, "0"))}</span>
+    <strong>${escapeHtml(lead.title)}</strong>
+    <small>${escapeHtml(lead.categoryLabel)} · ${escapeHtml(lead.year)}</small>
+  `;
+}
+
+function renderCategoryIndex() {
+  if (!categoryIndex) return;
+
+  const artifacts = allArtifacts();
+  categoryIndex.replaceChildren(
+    ...categories.filter((category) => category.id !== "all").map((category, index) => {
+      const count = artifacts.filter((artifact) => artifact.category === category.id).length;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-ticket";
+      button.setAttribute("aria-pressed", String(activeFilter === category.id));
+      button.setAttribute("data-motion-item", "category");
+      button.innerHTML = `
+        <span class="category-number">CAT.${String(index + 1).padStart(2, "0")}</span>
+        <strong>${escapeHtml(category.label)}</strong>
+        <span>${String(count).padStart(2, "0")} 件藏品</span>
+        <span aria-hidden="true">→</span>
+      `;
+      button.addEventListener("click", () => {
+        activeFilter = category.id;
+        renderCategoryIndex();
+        renderFilters();
+        renderCollection();
+        collectionGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
+        requestAnimationFrame(refreshMuseumScrollAnimations);
+      });
+      return button;
+    })
+  );
 }
 
 export function renderFilters() {
@@ -242,6 +323,7 @@ export function renderFilters() {
     button.setAttribute("aria-pressed", String(activeFilter === category.id));
     button.addEventListener("click", () => {
       activeFilter = category.id;
+      renderCategoryIndex();
       renderFilters();
       renderCollection();
       requestAnimationFrame(refreshMuseumScrollAnimations);
@@ -604,7 +686,9 @@ function updateCounts() {
 
 function initMuseum() {
   updateCounts();
+  renderHeroStage();
   renderFeatured();
+  renderCategoryIndex();
   renderFilters();
   renderCollection();
   renderManagerList();

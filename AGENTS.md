@@ -46,9 +46,10 @@ Rules:
 - `index.html` contains the semantic shell, font links, major museum sections, and dialog container.
 - `src/collection.ts` owns typed sample artifact data, cover image paths, and three detail gallery image paths per artifact. Replace or expand real collection entries here first.
 - `src/artifact-store.ts` owns browser-local artifact CRUD, query, and persistence helpers. It stores uploaded image data URLs under `mxren-museum.local-artifacts.v1` in the current browser profile.
-- `src/main.ts` renders featured artifacts, filters, collection cards, counts, local PNG cover images, browser-local managed artifacts, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
+- `src/main.ts` renders the hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, browser-local managed artifacts, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, opening timeline, scroll reveal, filter refresh, wax-seal loop, desktop-light parallax, and dialog open/close animation.
 - `src/styles.css` owns the Academia/Classical design system: dark mahogany, aged oak, parchment text, polished brass interactions, crimson wax seals, arch-top covers, sepia-to-color transitions, paper texture, vignette, ornate dividers, and responsive layout.
+- The poster exhibition mode is intentional: preserve `#hero-stage-gallery`, `#category-index`, numbered poster cards, and the `No.xxx / 细赏` browsing language unless a new design decision replaces it.
 - `.github/workflows/deploy-pages.yml` runs `npm ci`, `npm run build`, uploads `dist`, and deploys to GitHub Pages.
 - `public/artifacts/` contains 36 generated local PNG placeholder assets: 1 cover and 3 detail images for each of the 9 sample artifacts.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.

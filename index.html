@@ -8,6 +8,7 @@
       content="mxren-museum 是一个用于收藏游戏、风景与个人作品的私人数字藏馆。"
     />
     <title>mxren-museum | 私人数字藏馆</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -53,8 +54,13 @@
           </div>
 
           <aside class="hero-cabinet" aria-label="藏馆摘要">
-            <div class="cabinet-plate arch-top sepia-reveal" role="img" aria-label="私人数字藏馆精选封面" data-motion-image>
-              <span class="cover-symbol" aria-hidden="true">✶</span>
+            <div class="hero-stage-card corner-flourish" data-motion-image>
+              <div class="stage-rack" id="hero-stage-gallery" aria-label="精选藏品海报舞台"></div>
+              <div class="stage-caption" id="hero-stage-caption" aria-live="polite">
+                <span>展厅 01</span>
+                <strong>正在布展</strong>
+                <small>精选藏品</small>
+              </div>
             </div>
             <dl class="museum-stats">
               <div>
@@ -92,8 +98,9 @@
           <div class="section-heading">
             <p class="volume-label">Volume III</p>
             <h2 id="collection-title" data-motion-title>馆藏目录</h2>
-            <p>按藏品类型浏览，每张封面都像一张旧照片，等待在触碰时恢复它原本的色彩。</p>
+            <p>按展厅分类进入目录，或直接在本季陈列里浏览编号藏品。每张封面都像一张可以反复细赏的私人海报。</p>
           </div>
+          <div id="category-index" class="category-index" aria-label="馆藏分类入口"></div>
           <div class="manager-search">
             <label for="artifact-search">查询馆藏</label>
             <input

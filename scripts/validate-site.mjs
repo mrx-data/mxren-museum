@@ -219,6 +219,14 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 });
 
 [
+  'id="hero-stage-gallery"',
+  'id="hero-stage-caption"',
+  'id="category-index"'
+].forEach((pattern) => {
+  assert(html.includes(pattern), `Missing poster gallery markup: ${pattern}`);
+});
+
+[
   "readImageFileAsDataUrl",
   "handleArtifactSubmit",
   "handleArtifactDelete",
@@ -233,6 +241,16 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 });
 
 [
+  "artifactNumber",
+  "renderHeroStage",
+  "renderCategoryIndex",
+  "poster-card-topline",
+  "category-ticket"
+].forEach((pattern) => {
+  assert(main.includes(pattern), `Missing poster gallery script pattern: ${pattern}`);
+});
+
+[
   "management-panel",
   "artifact-form",
   "upload-preview",
@@ -240,6 +258,17 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "status-line"
 ].forEach((pattern) => {
   assert(css.includes(pattern), `Missing artifact management styling: ${pattern}`);
+});
+
+[
+  "hero-stage-card",
+  "stage-rack",
+  "category-index",
+  "category-ticket",
+  "poster-work",
+  "poster-specs"
+].forEach((pattern) => {
+  assert(css.includes(pattern), `Missing poster gallery styling: ${pattern}`);
 });
 
 assert(readme.includes("browser-local"), "README must document browser-local management storage");
