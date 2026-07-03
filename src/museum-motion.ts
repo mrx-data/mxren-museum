@@ -14,6 +14,10 @@ function motionElements<T extends Element>(selector: string, root: ParentNode = 
   return Array.from(root.querySelectorAll<T>(selector));
 }
 
+function isHiddenByRoute(element: HTMLElement) {
+  return element.hidden || element.closest("[hidden]") !== null;
+}
+
 function killMuseumScrollTriggers() {
   ScrollTrigger.getAll().forEach((trigger) => {
     if (typeof trigger.vars.id === "string" && trigger.vars.id.startsWith("museum-")) {
@@ -67,7 +71,7 @@ function initAmbientMotion() {
 
 function initOpeningTimeline() {
   const hero = document.querySelector<HTMLElement>("[data-motion-hero]");
-  if (!hero) return;
+  if (!hero || isHiddenByRoute(hero)) return;
 
   const title = hero.querySelector<HTMLElement>("[data-motion-title]");
   const volume = hero.querySelector<HTMLElement>(".volume-label");
@@ -131,6 +135,8 @@ function initSectionTimeline(section: HTMLElement, index: number) {
 
 function initDividerTimelines() {
   motionElements<HTMLElement>(".ornate-divider").forEach((divider, index) => {
+    if (isHiddenByRoute(divider)) return;
+
     gsap.fromTo(
       divider,
       { autoAlpha: 0.35, scaleX: 0.68 },
@@ -154,6 +160,8 @@ function initDesktopParallax() {
   if (!desktopMotionQuery.matches) return;
 
   motionElements<HTMLElement>(".hero-cabinet, .curator-notes").forEach((element, index) => {
+    if (isHiddenByRoute(element)) return;
+
     gsap.to(element, {
       yPercent: index === 0 ? -4 : -2,
       ease: "none",
@@ -182,6 +190,7 @@ export function refreshMuseumScrollAnimations() {
 
   motionElements<HTMLElement>("[data-motion-section]").forEach((section, index) => {
     if (section.matches(".site-header")) return;
+    if (isHiddenByRoute(section)) return;
     initSectionTimeline(section, index);
   });
 

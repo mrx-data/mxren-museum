@@ -15,14 +15,14 @@
       rel="stylesheet"
     />
   </head>
-  <body data-motion-root>
+  <body data-motion-root data-route="home">
     <div class="paper-texture" aria-hidden="true"></div>
     <div class="vignette" aria-hidden="true"></div>
     <div class="museum-atmosphere" data-motion-ambient aria-hidden="true"></div>
 
     <div id="app" class="museum-shell">
       <header class="site-header" data-motion-section>
-        <a class="brand-mark" href="#top" aria-label="mxren-museum 首页">
+        <a class="brand-mark" href="#home" aria-label="mxren-museum 首页" data-nav-route="home" data-nav-target="top">
           <span class="brand-sigil" aria-hidden="true">M</span>
           <span>
             <strong>mxren-museum</strong>
@@ -30,15 +30,16 @@
           </span>
         </a>
         <nav class="site-nav" aria-label="主导航">
-          <a href="#featured">精选藏品</a>
-          <a href="#collection">馆藏目录</a>
-          <a href="#manage">藏品管理</a>
-          <a href="#notes">策展原则</a>
+          <a href="#home" data-nav-route="home" data-nav-target="top">首页</a>
+          <a href="#featured" data-nav-route="home" data-nav-target="featured">精选藏品</a>
+          <a href="#collection" data-nav-route="collection" data-nav-target="collection">馆藏目录</a>
+          <a href="#manage" data-nav-route="manage" data-nav-target="manage">藏品管理</a>
+          <a href="#notes" data-nav-route="home" data-nav-target="notes">策展原则</a>
         </nav>
       </header>
 
       <main>
-        <section id="top" class="hero-section corner-flourish-large" aria-labelledby="hero-title" data-motion-hero>
+        <section id="top" class="hero-section corner-flourish-large" aria-labelledby="hero-title" data-page="home" data-motion-hero>
           <div class="hero-copy">
             <p class="volume-label">Volume I</p>
             <h1 id="hero-title" data-motion-title>私人数字藏馆</h1>
@@ -72,9 +73,9 @@
           </aside>
         </section>
 
-        <div class="ornate-divider" aria-hidden="true"></div>
+        <div class="ornate-divider" aria-hidden="true" data-page="home"></div>
 
-        <section id="featured" class="section-block" aria-labelledby="featured-title" data-motion-section>
+        <section id="featured" class="section-block" aria-labelledby="featured-title" data-page="home" data-motion-section>
           <div class="section-heading">
             <p class="volume-label">Volume II</p>
             <h2 id="featured-title" data-motion-title>精选藏品</h2>
@@ -85,21 +86,30 @@
           <div id="featured-gallery" class="featured-grid" aria-live="polite"></div>
         </section>
 
-        <div class="ornate-divider" aria-hidden="true"></div>
+        <div class="ornate-divider" aria-hidden="true" data-page="home"></div>
 
-        <section id="collection" class="section-block" aria-labelledby="collection-title" data-motion-section>
+        <section id="collection" class="section-block page-section" aria-labelledby="collection-title" data-page="collection" data-motion-section>
           <div class="section-heading">
             <p class="volume-label">Volume III</p>
             <h2 id="collection-title" data-motion-title>馆藏目录</h2>
             <p>按藏品类型浏览，每张封面都像一张旧照片，等待在触碰时恢复它原本的色彩。</p>
           </div>
+          <div class="manager-search">
+            <label for="artifact-search">查询馆藏</label>
+            <input
+              id="artifact-search"
+              name="artifact-search"
+              type="search"
+              autocomplete="off"
+              aria-label="查询藏品标题、描述、类别、年份或媒介"
+              placeholder="输入标题、描述、类别、年份或媒介"
+            />
+          </div>
           <div id="filter-bar" class="filter-bar" aria-label="按类别筛选藏品"></div>
           <div id="collection-grid" class="collection-grid" aria-live="polite"></div>
         </section>
 
-        <div class="ornate-divider" aria-hidden="true"></div>
-
-        <section id="manage" class="section-block management-section" aria-labelledby="manage-title" data-motion-section>
+        <section id="manage" class="section-block page-section management-section" aria-labelledby="manage-title" data-page="manage" data-motion-section>
           <div class="section-heading">
             <p class="volume-label">Volume IV</p>
             <h2 id="manage-title" data-motion-title>藏品管理</h2>
@@ -107,18 +117,6 @@
           </div>
 
           <div class="management-panel corner-flourish">
-            <div class="manager-search">
-              <label for="artifact-search">查询馆藏</label>
-              <input
-                id="artifact-search"
-                name="artifact-search"
-                type="search"
-                autocomplete="off"
-                aria-label="查询藏品标题、描述、类别、年份或媒介"
-                placeholder="输入标题、描述、类别、年份或媒介"
-              />
-            </div>
-
             <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading">
               <input id="artifact-form-id" name="artifact-form-id" type="hidden" />
               <div class="form-heading">
@@ -205,9 +203,9 @@
           </div>
         </section>
 
-        <div class="ornate-divider" aria-hidden="true"></div>
+        <div class="ornate-divider" aria-hidden="true" data-page="home"></div>
 
-        <section id="notes" class="curator-notes corner-flourish" aria-labelledby="notes-title" data-motion-section>
+        <section id="notes" class="curator-notes corner-flourish" aria-labelledby="notes-title" data-page="home" data-motion-section>
           <div>
             <p class="volume-label">Volume V</p>
             <h2 id="notes-title" data-motion-title>策展原则</h2>

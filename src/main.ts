@@ -19,6 +19,18 @@ import {
 } from "./museum-motion";
 
 type FilterId = "all" | ArtifactCategory;
+type MuseumRoute = "home" | "collection" | "manage";
+
+interface RouteState {
+  route: MuseumRoute;
+  targetId: string;
+}
+
+const routeTitles: Record<MuseumRoute, string> = {
+  home: "mxren-museum | 私人数字藏馆",
+  collection: "馆藏目录 | mxren-museum",
+  manage: "藏品管理 | mxren-museum"
+};
 
 let activeFilter: FilterId = "all";
 let searchQuery = "";
@@ -55,6 +67,8 @@ const artifactGalleryPreview = document.querySelector<HTMLElement>("#artifact-ga
 const artifactManagerList = document.querySelector<HTMLElement>("#artifact-manager-list");
 const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-manager-status");
 const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
+const pageElements = Array.from(document.querySelectorAll<HTMLElement>("[data-page]"));
+const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".site-nav [data-nav-route]"));
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => {
@@ -87,6 +101,60 @@ function createImageElement(src: string, alt: string) {
 
 function isArtifactCategory(value: string): value is ArtifactCategory {
   return value === "games" || value === "landscapes" || value === "personal-works";
+}
+
+function routeFromHash(hash = window.location.hash): RouteState {
+  const target = hash.replace(/^#\/?/, "") || "home";
+
+  if (target === "collection") {
+    return { route: "collection", targetId: "collection" };
+  }
+
+  if (target === "manage") {
+    return { route: "manage", targetId: "manage" };
+  }
+
+  if (target === "featured" || target === "notes") {
+    return { route: "home", targetId: target };
+  }
+
+  return { route: "home", targetId: "top" };
+}
+
+function setActiveNavigation({ route, targetId }: RouteState) {
+  navLinks.forEach((link) => {
+    const isCurrent = link.dataset.navRoute === route && link.dataset.navTarget === targetId;
+    link.classList.toggle("is-active", isCurrent);
+
+    if (isCurrent) {
+      link.setAttribute("aria-current", route === "home" && targetId !== "top" ? "location" : "page");
+      return;
+    }
+
+    link.removeAttribute("aria-current");
+  });
+}
+
+function showRoutePage(routeState: RouteState, shouldScroll = true) {
+  document.body.dataset.route = routeState.route;
+  document.title = routeTitles[routeState.route];
+
+  pageElements.forEach((element) => {
+    element.hidden = element.dataset.page !== routeState.route;
+  });
+
+  setActiveNavigation(routeState);
+
+  requestAnimationFrame(() => {
+    refreshMuseumScrollAnimations();
+
+    if (!shouldScroll) return;
+    document.getElementById(routeState.targetId)?.scrollIntoView({ block: "start" });
+  });
+}
+
+function syncRouteFromHash(shouldScroll = true) {
+  showRoutePage(routeFromHash(), shouldScroll);
 }
 
 function allArtifacts() {
@@ -525,6 +593,10 @@ function bindManagementEvents() {
   artifactFormReset?.addEventListener("click", resetArtifactForm);
 }
 
+function bindRouteEvents() {
+  window.addEventListener("hashchange", () => syncRouteFromHash());
+}
+
 function updateCounts() {
   if (artifactCount) artifactCount.textContent = String(allArtifacts().length).padStart(2, "0");
   if (categoryCount) categoryCount.textContent = String(categories.length - 1).padStart(2, "0");
@@ -539,6 +611,8 @@ function initMuseum() {
   renderUploadPreviews();
   bindDialogEvents();
   bindManagementEvents();
+  bindRouteEvents();
+  syncRouteFromHash();
   initMuseumMotion();
 }
 
