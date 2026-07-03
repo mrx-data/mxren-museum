@@ -44,6 +44,7 @@ const main = read("src/main.ts");
 const css = read("src/styles.css");
 const readme = read("README.md");
 const motion = exists("src/museum-motion.ts") ? read("src/museum-motion.ts") : "";
+const artifactStore = exists("src/artifact-store.ts") ? read("src/artifact-store.ts") : "";
 const gitignore = exists(".gitignore") ? read(".gitignore") : "";
 const deployWorkflow = exists(".github/workflows/deploy-pages.yml") ? read(".github/workflows/deploy-pages.yml") : "";
 const viteConfig = read("vite.config.ts");
@@ -73,7 +74,7 @@ assert(pkg.dependencies?.gsap || pkg.devDependencies?.gsap, "Missing local GSAP 
   assert(css.includes(pattern), `Missing required visual/accessibility pattern: ${pattern}`);
 });
 
-["Volume I", "Volume II", "Volume III", "Volume IV"].forEach((label) => {
+["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V"].forEach((label) => {
   assert(html.includes(label), `Missing Roman volume label: ${label}`);
 });
 
@@ -189,5 +190,59 @@ assert(css.includes(".motion-reveal"), "Missing motion reveal styling");
 
 assert(viteConfig.includes("GITHUB_ACTIONS"), "Missing GitHub Pages base environment switch");
 assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository base path");
+
+assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
+
+[
+  "mxren-museum.local-artifacts.v1",
+  "createLocalArtifact",
+  "updateLocalArtifact",
+  "deleteLocalArtifact",
+  "queryArtifacts",
+  "loadLocalArtifacts",
+  "saveLocalArtifacts"
+].forEach((pattern) => {
+  assert(artifactStore.includes(pattern), `Missing artifact store pattern: ${pattern}`);
+});
+
+[
+  'id="artifact-search"',
+  'id="artifact-form"',
+  'id="artifact-cover-upload"',
+  'id="artifact-gallery-upload"',
+  'id="artifact-manager-list"',
+  'id="artifact-manager-status"',
+  'accept="image/*"',
+  "multiple"
+].forEach((pattern) => {
+  assert(html.includes(pattern), `Missing artifact management markup: ${pattern}`);
+});
+
+[
+  "readImageFileAsDataUrl",
+  "handleArtifactSubmit",
+  "handleArtifactDelete",
+  "handleArtifactEdit",
+  "queryArtifacts",
+  "loadLocalArtifacts",
+  "saveLocalArtifacts",
+  "Promise.all(files.map",
+  ".slice(0, 3)"
+].forEach((pattern) => {
+  assert(main.includes(pattern), `Missing artifact management script pattern: ${pattern}`);
+});
+
+[
+  "management-panel",
+  "artifact-form",
+  "upload-preview",
+  "manager-list",
+  "status-line"
+].forEach((pattern) => {
+  assert(css.includes(pattern), `Missing artifact management styling: ${pattern}`);
+});
+
+assert(readme.includes("browser-local"), "README must document browser-local management storage");
+assert(read("AGENTS.md").includes("browser-local"), "AGENTS must document browser-local management storage");
 
 console.log(`mxren-museum validation passed (${itemCount} artifacts).`);

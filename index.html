@@ -32,6 +32,7 @@
         <nav class="site-nav" aria-label="主导航">
           <a href="#featured">精选藏品</a>
           <a href="#collection">馆藏目录</a>
+          <a href="#manage">藏品管理</a>
           <a href="#notes">策展原则</a>
         </nav>
       </header>
@@ -98,9 +99,117 @@
 
         <div class="ornate-divider" aria-hidden="true"></div>
 
+        <section id="manage" class="section-block management-section" aria-labelledby="manage-title" data-motion-section>
+          <div class="section-heading">
+            <p class="volume-label">Volume IV</p>
+            <h2 id="manage-title" data-motion-title>藏品管理</h2>
+            <p>把新的数字标本写入本地馆藏账册，上传封面与详情图，并在当前浏览器里保存修改。</p>
+          </div>
+
+          <div class="management-panel corner-flourish">
+            <div class="manager-search">
+              <label for="artifact-search">查询馆藏</label>
+              <input
+                id="artifact-search"
+                name="artifact-search"
+                type="search"
+                autocomplete="off"
+                aria-label="查询藏品标题、描述、类别、年份或媒介"
+                placeholder="输入标题、描述、类别、年份或媒介"
+              />
+            </div>
+
+            <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading">
+              <input id="artifact-form-id" name="artifact-form-id" type="hidden" />
+              <div class="form-heading">
+                <div>
+                  <p class="volume-label">Local ledger</p>
+                  <h3 id="artifact-form-heading">新增藏品</h3>
+                </div>
+                <p class="status-line" id="artifact-manager-status" aria-live="polite">
+                  browser-local storage
+                </p>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  <span>藏品标题</span>
+                  <input id="artifact-form-title" name="title" type="text" autocomplete="off" required />
+                </label>
+                <label>
+                  <span>类别</span>
+                  <select id="artifact-form-category" name="category" required>
+                    <option value="games">游戏藏品</option>
+                    <option value="landscapes">风景切片</option>
+                    <option value="personal-works">个人作品</option>
+                  </select>
+                </label>
+                <label>
+                  <span>年份</span>
+                  <input id="artifact-form-year" name="year" type="text" inputmode="numeric" autocomplete="off" />
+                </label>
+                <label>
+                  <span>媒介</span>
+                  <input id="artifact-form-medium" name="medium" type="text" autocomplete="off" />
+                </label>
+                <label>
+                  <span>标记</span>
+                  <input id="artifact-form-rarity" name="rarity" type="text" autocomplete="off" />
+                </label>
+                <label class="checkbox-field">
+                  <input id="artifact-form-featured" name="featured" type="checkbox" />
+                  <span>加入精选蜡封</span>
+                </label>
+              </div>
+
+              <label class="wide-field">
+                <span>藏品描述</span>
+                <textarea id="artifact-form-summary" name="summary" rows="3" required></textarea>
+              </label>
+              <label class="wide-field">
+                <span>详情说明</span>
+                <textarea id="artifact-form-note" name="note" rows="4"></textarea>
+              </label>
+
+              <div class="upload-grid">
+                <label class="upload-field">
+                  <span>封面图片</span>
+                  <input id="artifact-cover-upload" name="cover" type="file" accept="image/*" />
+                  <span class="upload-hint">单张图片，保存到当前浏览器</span>
+                </label>
+                <div id="artifact-cover-preview" class="upload-preview" aria-label="封面图片预览"></div>
+
+                <label class="upload-field">
+                  <span>详情图片</span>
+                  <input id="artifact-gallery-upload" name="gallery" type="file" accept="image/*" multiple />
+                  <span class="upload-hint">最多三张，进入详情弹窗图集</span>
+                </label>
+                <div id="artifact-gallery-preview" class="upload-preview gallery-preview" aria-label="详情图片预览"></div>
+              </div>
+
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">保存藏品</button>
+                <button class="button button-secondary" id="artifact-form-reset" type="button">清空表单</button>
+              </div>
+            </form>
+
+            <div class="manager-list-wrap" aria-labelledby="manager-list-title">
+              <div class="form-heading">
+                <div>
+                  <p class="volume-label">Local additions</p>
+                  <h3 id="manager-list-title">本地藏品</h3>
+                </div>
+              </div>
+              <div id="artifact-manager-list" class="manager-list" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="ornate-divider" aria-hidden="true"></div>
+
         <section id="notes" class="curator-notes corner-flourish" aria-labelledby="notes-title" data-motion-section>
           <div>
-            <p class="volume-label">Volume IV</p>
+            <p class="volume-label">Volume V</p>
             <h2 id="notes-title" data-motion-title>策展原则</h2>
           </div>
           <div class="note-ledger">

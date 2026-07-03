@@ -26,6 +26,8 @@ export type Artifact = {
   };
   summary: string;
   note: string;
+  source?: "sample" | "local";
+  updatedAt?: string;
 };
 
 export const categories: Array<{ id: "all" | ArtifactCategory; label: string }> = [

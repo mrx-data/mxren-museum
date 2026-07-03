@@ -1,5 +1,16 @@
 import "./styles.css";
-import { artifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
+import { artifacts as sampleArtifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
+import {
+  createLocalArtifact,
+  deleteLocalArtifact,
+  loadLocalArtifacts,
+  queryArtifacts,
+  saveLocalArtifacts,
+  updateLocalArtifact,
+  type ArtifactFormInput,
+  type GalleryImageInput,
+  type ManagedArtifact
+} from "./artifact-store";
 import {
   animateArtifactDialog,
   animateArtifactDialogClose,
@@ -10,7 +21,12 @@ import {
 type FilterId = "all" | ArtifactCategory;
 
 let activeFilter: FilterId = "all";
+let searchQuery = "";
 let dialogClosing = false;
+let localArtifacts: ManagedArtifact[] = loadLocalArtifacts();
+let editingArtifactId: string | null = null;
+let pendingCoverImage = "";
+let pendingGalleryImages: GalleryImageInput[] = [];
 
 const artifactCount = document.querySelector<HTMLElement>("#artifact-count");
 const categoryCount = document.querySelector<HTMLElement>("#category-count");
@@ -20,6 +36,38 @@ const collectionGrid = document.querySelector<HTMLElement>("#collection-grid");
 const dialog = document.querySelector<HTMLDialogElement>("#artifact-dialog");
 const dialogBody = document.querySelector<HTMLElement>("#dialog-body");
 const dialogClose = document.querySelector<HTMLButtonElement>(".dialog-close");
+const artifactSearch = document.querySelector<HTMLInputElement>("#artifact-search");
+const artifactForm = document.querySelector<HTMLFormElement>("#artifact-form");
+const artifactFormHeading = document.querySelector<HTMLElement>("#artifact-form-heading");
+const artifactFormId = document.querySelector<HTMLInputElement>("#artifact-form-id");
+const artifactFormTitle = document.querySelector<HTMLInputElement>("#artifact-form-title");
+const artifactFormCategory = document.querySelector<HTMLSelectElement>("#artifact-form-category");
+const artifactFormYear = document.querySelector<HTMLInputElement>("#artifact-form-year");
+const artifactFormMedium = document.querySelector<HTMLInputElement>("#artifact-form-medium");
+const artifactFormRarity = document.querySelector<HTMLInputElement>("#artifact-form-rarity");
+const artifactFormSummary = document.querySelector<HTMLTextAreaElement>("#artifact-form-summary");
+const artifactFormNote = document.querySelector<HTMLTextAreaElement>("#artifact-form-note");
+const artifactFormFeatured = document.querySelector<HTMLInputElement>("#artifact-form-featured");
+const artifactCoverUpload = document.querySelector<HTMLInputElement>("#artifact-cover-upload");
+const artifactGalleryUpload = document.querySelector<HTMLInputElement>("#artifact-gallery-upload");
+const artifactCoverPreview = document.querySelector<HTMLElement>("#artifact-cover-preview");
+const artifactGalleryPreview = document.querySelector<HTMLElement>("#artifact-gallery-preview");
+const artifactManagerList = document.querySelector<HTMLElement>("#artifact-manager-list");
+const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-manager-status");
+const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[character] ?? character;
+  });
+}
 
 function setCoverStyle(element: HTMLElement, artifact: Artifact) {
   element.style.setProperty("--cover-from", artifact.palette.from);
@@ -35,6 +83,40 @@ function createImageElement(src: string, alt: string) {
   image.loading = "lazy";
   image.decoding = "async";
   return image;
+}
+
+function isArtifactCategory(value: string): value is ArtifactCategory {
+  return value === "games" || value === "landscapes" || value === "personal-works";
+}
+
+function allArtifacts() {
+  return [...sampleArtifacts, ...localArtifacts];
+}
+
+function persistLocalArtifacts() {
+  saveLocalArtifacts(localArtifacts);
+}
+
+function showManagerStatus(message: string, tone: "neutral" | "success" | "danger" = "neutral") {
+  if (!artifactManagerStatus) return;
+  artifactManagerStatus.textContent = message;
+  artifactManagerStatus.dataset.tone = tone;
+}
+
+function refreshMuseumView() {
+  updateCounts();
+  renderFeatured();
+  renderFilters();
+  renderCollection();
+  renderManagerList();
+  requestAnimationFrame(refreshMuseumScrollAnimations);
+}
+
+function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
+  if (artifact.coverImage) {
+    cover.append(createImageElement(artifact.coverImage, artifact.coverAlt));
+  }
+  cover.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
 }
 
 function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
@@ -54,16 +136,15 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);
   setCoverStyle(cover, artifact);
-  cover.append(createImageElement(artifact.coverImage, artifact.coverAlt));
-  cover.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${artifact.symbol}</span>`);
+  appendCoverImage(cover, artifact);
 
   const body = document.createElement("div");
   body.className = "artifact-body";
   body.innerHTML = `
-    <p class="artifact-volume">Volume ${artifact.volume}</p>
-    <h3>${artifact.title}</h3>
-    <p class="artifact-meta">${artifact.categoryLabel} · ${artifact.year}</p>
-    <p>${artifact.summary}</p>
+    <p class="artifact-volume">Volume ${escapeHtml(artifact.volume)}</p>
+    <h3>${escapeHtml(artifact.title)}</h3>
+    <p class="artifact-meta">${escapeHtml(artifact.categoryLabel)} · ${escapeHtml(artifact.year)}</p>
+    <p>${escapeHtml(artifact.summary)}</p>
   `;
 
   if (artifact.featured) {
@@ -104,15 +185,13 @@ export function renderFilters() {
 export function renderCollection() {
   if (!collectionGrid) return;
 
-  const visibleArtifacts =
-    activeFilter === "all" ? artifacts : artifacts.filter((artifact) => artifact.category === activeFilter);
-
+  const visibleArtifacts = queryArtifacts(allArtifacts(), searchQuery, activeFilter);
   collectionGrid.replaceChildren(...visibleArtifacts.map((artifact) => artifactCard(artifact, "standard")));
 }
 
 function renderFeatured() {
   if (!featuredGallery) return;
-  const featured = artifacts.filter((artifact) => artifact.featured);
+  const featured = allArtifacts().filter((artifact) => artifact.featured);
   featuredGallery.replaceChildren(...featured.map((artifact) => artifactCard(artifact, "featured")));
 }
 
@@ -126,22 +205,21 @@ export function openArtifactDialog(artifact: Artifact) {
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);
   setCoverStyle(cover, artifact);
-  cover.append(createImageElement(artifact.coverImage, artifact.coverAlt));
-  cover.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${artifact.symbol}</span>`);
+  appendCoverImage(cover, artifact);
 
   const copy = document.createElement("div");
   copy.className = "dialog-copy";
   copy.innerHTML = `
-    <p class="volume-label">Volume ${artifact.volume}</p>
-    <h2 id="dialog-title">${artifact.title}</h2>
+    <p class="volume-label">Volume ${escapeHtml(artifact.volume)}</p>
+    <h2 id="dialog-title">${escapeHtml(artifact.title)}</h2>
     <dl class="artifact-ledger">
-      <div><dt>类别</dt><dd>${artifact.categoryLabel}</dd></div>
-      <div><dt>年份</dt><dd>${artifact.year}</dd></div>
-      <div><dt>媒介</dt><dd>${artifact.medium}</dd></div>
-      <div><dt>标记</dt><dd>${artifact.rarity}</dd></div>
+      <div><dt>类别</dt><dd>${escapeHtml(artifact.categoryLabel)}</dd></div>
+      <div><dt>年份</dt><dd>${escapeHtml(artifact.year)}</dd></div>
+      <div><dt>媒介</dt><dd>${escapeHtml(artifact.medium)}</dd></div>
+      <div><dt>标记</dt><dd>${escapeHtml(artifact.rarity)}</dd></div>
     </dl>
-    <p class="dialog-summary">${artifact.summary}</p>
-    <p>${artifact.note}</p>
+    <p class="dialog-summary">${escapeHtml(artifact.summary)}</p>
+    <p>${escapeHtml(artifact.note)}</p>
   `;
 
   copy.querySelectorAll(".artifact-ledger div").forEach((item) => {
@@ -183,6 +261,231 @@ export function closeArtifactDialog() {
   });
 }
 
+export function readImageFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Invalid image file"));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Invalid image result"));
+    });
+    reader.addEventListener("error", () => reject(new Error("Image read failed")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderUploadPreviews() {
+  artifactCoverPreview?.replaceChildren();
+  artifactGalleryPreview?.replaceChildren();
+
+  if (artifactCoverPreview && pendingCoverImage) {
+    const image = createImageElement(pendingCoverImage, "封面图片预览");
+    artifactCoverPreview.append(image);
+  }
+
+  if (artifactGalleryPreview) {
+    pendingGalleryImages.forEach((galleryImage) => {
+      const figure = document.createElement("figure");
+      const image = createImageElement(galleryImage.src, galleryImage.alt ?? "详情图片预览");
+      const caption = document.createElement("figcaption");
+      caption.textContent = galleryImage.label ?? "详情";
+      figure.append(image, caption);
+      artifactGalleryPreview.append(figure);
+    });
+  }
+}
+
+async function handleCoverUpload(event: Event) {
+  const input = event.currentTarget as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  try {
+    pendingCoverImage = await readImageFileAsDataUrl(file);
+    renderUploadPreviews();
+    showManagerStatus("封面已载入", "success");
+  } catch {
+    showManagerStatus("图片读取失败，请换一张图片", "danger");
+  }
+}
+
+async function handleGalleryUpload(event: Event) {
+  const input = event.currentTarget as HTMLInputElement;
+  const files = Array.from(input.files ?? []).slice(0, 3);
+  if (files.length === 0) return;
+
+  try {
+    const sources = await Promise.all(files.map((file) => readImageFileAsDataUrl(file)));
+    const title = artifactFormTitle?.value.trim() || "本地藏品";
+    pendingGalleryImages = sources.map((src, index) => ({
+      src,
+      alt: `${title} 的详情图片 ${index + 1}`,
+      label: ["细节", "记忆", "图板"][index] ?? `图 ${index + 1}`
+    }));
+    renderUploadPreviews();
+    showManagerStatus("详情图片已载入", "success");
+  } catch {
+    showManagerStatus("图片读取失败，请换一张图片", "danger");
+  }
+}
+
+function artifactFormInput(): ArtifactFormInput | null {
+  const title = artifactFormTitle?.value.trim() ?? "";
+  const category = artifactFormCategory?.value ?? "";
+
+  if (!title) {
+    showManagerStatus("请输入藏品标题", "danger");
+    artifactFormTitle?.focus();
+    return null;
+  }
+
+  if (!isArtifactCategory(category)) {
+    showManagerStatus("请选择藏品类别", "danger");
+    artifactFormCategory?.focus();
+    return null;
+  }
+
+  return {
+    id: artifactFormId?.value || undefined,
+    title,
+    category,
+    year: artifactFormYear?.value.trim() ?? "",
+    medium: artifactFormMedium?.value.trim() ?? "",
+    rarity: artifactFormRarity?.value.trim() ?? "",
+    featured: artifactFormFeatured?.checked ?? false,
+    coverImage: pendingCoverImage,
+    coverAlt: `${title} 的藏品封面`,
+    galleryImages: pendingGalleryImages,
+    summary: artifactFormSummary?.value.trim() ?? "",
+    note: artifactFormNote?.value.trim() ?? ""
+  };
+}
+
+function resetArtifactForm() {
+  artifactForm?.reset();
+  if (artifactFormId) artifactFormId.value = "";
+  editingArtifactId = null;
+  pendingCoverImage = "";
+  pendingGalleryImages = [];
+  if (artifactFormHeading) artifactFormHeading.textContent = "新增藏品";
+  renderUploadPreviews();
+  showManagerStatus("browser-local storage");
+}
+
+export async function handleArtifactSubmit(event: SubmitEvent) {
+  event.preventDefault();
+  const input = artifactFormInput();
+  if (!input) return;
+
+  try {
+    const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
+    if (editingArtifactId) {
+      localArtifacts = updateLocalArtifact(editingArtifactId, input, localArtifacts);
+    } else {
+      const created = createLocalArtifact(input, allArtifacts());
+      localArtifacts = [...localArtifacts, created];
+    }
+
+    persistLocalArtifacts();
+    resetArtifactForm();
+    showManagerStatus(successMessage, "success");
+    refreshMuseumView();
+  } catch {
+    showManagerStatus("浏览器存储空间不足，藏品未保存", "danger");
+  }
+}
+
+export function handleArtifactEdit(id: string) {
+  const artifact = localArtifacts.find((item) => item.id === id);
+  if (!artifact) return;
+
+  editingArtifactId = artifact.id;
+  pendingCoverImage = artifact.coverImage;
+  pendingGalleryImages = artifact.galleryImages.map((image) => ({ ...image }));
+
+  if (artifactFormId) artifactFormId.value = artifact.id;
+  if (artifactFormTitle) artifactFormTitle.value = artifact.title;
+  if (artifactFormCategory) artifactFormCategory.value = artifact.category;
+  if (artifactFormYear) artifactFormYear.value = artifact.year;
+  if (artifactFormMedium) artifactFormMedium.value = artifact.medium;
+  if (artifactFormRarity) artifactFormRarity.value = artifact.rarity;
+  if (artifactFormSummary) artifactFormSummary.value = artifact.summary;
+  if (artifactFormNote) artifactFormNote.value = artifact.note;
+  if (artifactFormFeatured) artifactFormFeatured.checked = artifact.featured;
+  if (artifactFormHeading) artifactFormHeading.textContent = "修改藏品";
+
+  renderUploadPreviews();
+  showManagerStatus(`正在修改：${artifact.title}`);
+  artifactForm?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+export function handleArtifactDelete(id: string) {
+  const artifact = localArtifacts.find((item) => item.id === id);
+  if (!artifact) return;
+
+  if (!globalThis.confirm(`删除本地藏品「${artifact.title}」？`)) return;
+
+  localArtifacts = deleteLocalArtifact(id, localArtifacts);
+  persistLocalArtifacts();
+  if (editingArtifactId === id) resetArtifactForm();
+  showManagerStatus("藏品已删除", "success");
+  refreshMuseumView();
+}
+
+function renderManagerList() {
+  if (!artifactManagerList) return;
+
+  if (localArtifacts.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "manager-empty";
+    empty.textContent = "还没有本地新增藏品。";
+    artifactManagerList.replaceChildren(empty);
+    return;
+  }
+
+  artifactManagerList.replaceChildren(
+    ...localArtifacts.map((artifact) => {
+      const row = document.createElement("article");
+      row.className = "manager-row";
+
+      const copy = document.createElement("div");
+      const title = document.createElement("h4");
+      title.textContent = artifact.title;
+      const meta = document.createElement("p");
+      meta.textContent = `${artifact.categoryLabel} · ${artifact.year} · ${artifact.rarity}`;
+      copy.append(title, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "manager-actions";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "button button-secondary";
+      editButton.textContent = "修改";
+      editButton.setAttribute("aria-label", `修改 ${artifact.title}`);
+      editButton.addEventListener("click", () => handleArtifactEdit(artifact.id));
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "button button-danger";
+      deleteButton.textContent = "删除";
+      deleteButton.setAttribute("aria-label", `删除 ${artifact.title}`);
+      deleteButton.addEventListener("click", () => handleArtifactDelete(artifact.id));
+
+      actions.append(editButton, deleteButton);
+      row.append(copy, actions);
+      return row;
+    })
+  );
+}
+
 function bindDialogEvents() {
   dialogClose?.addEventListener("click", closeArtifactDialog);
 
@@ -204,8 +507,26 @@ function bindDialogEvents() {
   });
 }
 
+function bindManagementEvents() {
+  artifactSearch?.addEventListener("input", () => {
+    searchQuery = artifactSearch.value;
+    renderCollection();
+    requestAnimationFrame(refreshMuseumScrollAnimations);
+  });
+  artifactForm?.addEventListener("submit", (event) => {
+    void handleArtifactSubmit(event);
+  });
+  artifactCoverUpload?.addEventListener("change", (event) => {
+    void handleCoverUpload(event);
+  });
+  artifactGalleryUpload?.addEventListener("change", (event) => {
+    void handleGalleryUpload(event);
+  });
+  artifactFormReset?.addEventListener("click", resetArtifactForm);
+}
+
 function updateCounts() {
-  if (artifactCount) artifactCount.textContent = String(artifacts.length).padStart(2, "0");
+  if (artifactCount) artifactCount.textContent = String(allArtifacts().length).padStart(2, "0");
   if (categoryCount) categoryCount.textContent = String(categories.length - 1).padStart(2, "0");
 }
 
@@ -214,7 +535,10 @@ function initMuseum() {
   renderFeatured();
   renderFilters();
   renderCollection();
+  renderManagerList();
+  renderUploadPreviews();
   bindDialogEvents();
+  bindManagementEvents();
   initMuseumMotion();
 }
 

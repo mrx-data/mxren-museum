@@ -18,9 +18,16 @@ npm run preview
 - Static Vite + TypeScript frontend.
 - Local sample collection data in `src/collection.ts`.
 - Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
+- Browser-local artifact management for creating, querying, editing, deleting, and uploading cover/detail images in the current browser.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, opening, scroll reveal, filter refresh, and detail dialog animation.
 - Academia/Classical visual system based on dark wood, parchment, brass, crimson wax seals, arch-top covers, and sepia-to-color image treatment.
-- No backend, login, upload flow, database, or secret handling. Production deployment is GitHub Pages.
+- No backend, login, server upload flow, database, or secret handling. Production deployment is GitHub Pages.
+
+## Browser-Local Management
+
+The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts. Cover images and detail images are uploaded with native browser file inputs, read as local data URLs, and persisted with the artifact data in browser-local storage.
+
+This browser-local storage is limited to the current browser profile. It does not sync across devices, users, or browsers.
 
 ## Remote And Deployment
 
@@ -35,6 +42,7 @@ npm run preview
 | --- | --- |
 | `index.html` | Semantic shell and museum sections |
 | `src/collection.ts` | Typed sample artifact data |
+| `src/artifact-store.ts` | Browser-local artifact CRUD, query, and persistence helpers |
 | `src/main.ts` | Rendering, filters, counts, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
