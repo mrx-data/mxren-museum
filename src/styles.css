@@ -121,7 +121,6 @@ button {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 18px 48px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(18px) saturate(135%);
-  -webkit-backdrop-filter: blur(18px) saturate(135%);
   transform: translateX(-50%);
 }
 
@@ -467,7 +466,6 @@ p {
   border: 1px solid rgba(201, 169, 98, 0.28);
   background: rgba(28, 23, 20, 0.76);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .stage-caption span,
