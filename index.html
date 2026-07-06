@@ -120,15 +120,37 @@
           <div class="section-heading">
             <p class="volume-label">Volume IV</p>
             <h2 id="manage-title" data-motion-title>藏品管理</h2>
-            <p>把新的数字标本写入本地馆藏账册，上传封面与详情图，并在当前浏览器里保存修改。</p>
+            <p>把新的数字标本写入云端馆藏账册，上传封面与详情图，并保留本地回退。</p>
           </div>
 
           <div class="management-panel corner-flourish">
+            <div class="auth-panel" aria-labelledby="auth-title">
+              <div class="form-heading">
+                <div>
+                  <p class="volume-label">Supabase</p>
+                  <h3 id="auth-title">云端登录</h3>
+                </div>
+                <p class="status-line" id="auth-status" aria-live="polite">supabase sign in</p>
+              </div>
+              <form id="auth-form" class="auth-form">
+                <label>
+                  <span>邮箱</span>
+                  <input id="auth-email" name="email" type="email" autocomplete="email" />
+                </label>
+                <label>
+                  <span>密码</span>
+                  <input id="auth-password" name="password" type="password" autocomplete="current-password" />
+                </label>
+                <button class="button button-secondary" type="submit">登录</button>
+              </form>
+              <button class="button button-secondary" id="auth-sign-out" type="button" hidden>退出登录</button>
+            </div>
+
             <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading">
               <input id="artifact-form-id" name="artifact-form-id" type="hidden" />
               <div class="form-heading">
                 <div>
-                  <p class="volume-label">Local ledger</p>
+                  <p class="volume-label">Collection ledger</p>
                   <h3 id="artifact-form-heading">新增藏品</h3>
                 </div>
                 <p class="status-line" id="artifact-manager-status" aria-live="polite">
@@ -180,7 +202,7 @@
                 <label class="upload-field">
                   <span>封面图片</span>
                   <input id="artifact-cover-upload" name="cover" type="file" accept="image/*" />
-                  <span class="upload-hint">单张图片，保存到当前浏览器</span>
+                  <span class="upload-hint">单张图片，登录后上传云端</span>
                 </label>
                 <div id="artifact-cover-preview" class="upload-preview" aria-label="封面图片预览"></div>
 
@@ -201,7 +223,7 @@
             <div class="manager-list-wrap" aria-labelledby="manager-list-title">
               <div class="form-heading">
                 <div>
-                  <p class="volume-label">Local additions</p>
+                  <p class="volume-label">Managed additions</p>
                   <h3 id="manager-list-title">本地藏品</h3>
                 </div>
               </div>

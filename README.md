@@ -1,6 +1,6 @@
 # mxren-museum
 
-mxren-museum is a first-version static frontend for a personal digital museum. It presents digital artifacts such as games, landscapes, and personal works as a classical private archive with covers, metadata, descriptions, filters, and detail views.
+mxren-museum is a Vite + TypeScript frontend for a personal digital museum. It presents digital artifacts such as games, landscapes, and personal works as a classical private archive with covers, metadata, descriptions, filters, detail views, and Supabase-backed managed artifacts.
 
 ## Commands
 
@@ -18,16 +18,37 @@ npm run preview
 - Static Vite + TypeScript frontend.
 - Local sample collection data in `src/collection.ts`.
 - Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
-- Browser-local artifact management for creating, querying, editing, deleting, and uploading cover/detail images in the current browser.
+- Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres + Storage.
+- Browser-local artifact management remains as a fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, opening, scroll reveal, filter refresh, and detail dialog animation.
 - Academia/Classical visual system based on dark wood, parchment, brass, crimson wax seals, arch-top covers, and sepia-to-color image treatment.
-- No backend, login, server upload flow, database, or secret handling. Production deployment is GitHub Pages.
+- No custom Node backend is required. Production deployment remains GitHub Pages.
+
+## Supabase Persistence
+
+The app uses `@supabase/supabase-js` from the browser with a publishable key. Public reads are allowed by RLS; writes require a signed-in Supabase user who is also listed in `public.museum_admins`.
+
+Environment variables:
+
+```bash
+VITE_SUPABASE_URL=https://wjhktoqihszgdkxbanxu.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+The publishable key is safe to expose in a static frontend, but database access must be protected by Row Level Security. Never put a Supabase secret key or legacy `service_role` key in this project.
+
+One-time Supabase setup:
+
+1. Run `supabase/migrations/20260706000000_museum_artifact_persistence.sql` in the Supabase SQL Editor or through the Supabase CLI.
+2. Create or invite the admin user in Supabase Auth.
+3. Insert that user ID into `public.museum_admins`.
+4. Confirm the `artifact-images` Storage bucket exists and is public-readable.
 
 ## Browser-Local Management
 
-The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts. Cover images and detail images are uploaded with native browser file inputs, read as local data URLs, and persisted with the artifact data in browser-local storage.
+The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts. When Supabase is available, uploaded images go to the `artifact-images` bucket and artifact rows go to `public.artifacts`.
 
-This browser-local storage is limited to the current browser profile. It does not sync across devices, users, or browsers.
+If Supabase is not configured or the remote schema is unavailable, the app falls back to browser-local storage. This fallback is limited to the current browser profile and does not sync across devices, users, or browsers.
 
 ## Remote And Deployment
 
@@ -35,6 +56,7 @@ This browser-local storage is limited to the current browser profile. It does no
 - GitHub Pages site: https://mrx-data.github.io/mxren-museum/
 - Deployment workflow: `.github/workflows/deploy-pages.yml`
 - Deployment trigger: pushes to `main`
+- GitHub Pages still serves static assets only; Supabase provides the runtime database, auth, and file storage layer.
 
 ## Project Structure
 
@@ -42,11 +64,14 @@ This browser-local storage is limited to the current browser profile. It does no
 | --- | --- |
 | `index.html` | Semantic shell and museum sections |
 | `src/collection.ts` | Typed sample artifact data |
-| `src/artifact-store.ts` | Browser-local artifact CRUD, query, and persistence helpers |
+| `src/supabase-client.ts` | Supabase client and publishable-key configuration |
+| `src/artifact-store.ts` | Supabase artifact CRUD, auth helpers, Storage upload, query, and browser-local fallback |
 | `src/main.ts` | Rendering, filters, counts, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
 | `public/artifacts/` | Generated local PNG placeholder covers and detail images |
+| `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
+| `supabase/migrations/` | Postgres tables, RLS policies, and Storage bucket policies |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
 | `.github/workflows/deploy-pages.yml` | GitHub Pages deployment workflow |
 | `docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md` | Design spec |

@@ -27,11 +27,15 @@ function assert(condition, message) {
   "index.html",
   "src/collection.ts",
   "src/main.ts",
+  "src/supabase-client.ts",
   "src/styles.css",
   "README.md",
   "AGENTS.md",
   ".gitignore",
+  ".env.example",
   ".github/workflows/deploy-pages.yml",
+  "docs/supabase-persistence.md",
+  "supabase/migrations/20260706000000_museum_artifact_persistence.sql",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -45,9 +49,13 @@ const css = read("src/styles.css");
 const readme = read("README.md");
 const motion = exists("src/museum-motion.ts") ? read("src/museum-motion.ts") : "";
 const artifactStore = exists("src/artifact-store.ts") ? read("src/artifact-store.ts") : "";
+const supabaseClient = read("src/supabase-client.ts");
 const gitignore = exists(".gitignore") ? read(".gitignore") : "";
 const deployWorkflow = exists(".github/workflows/deploy-pages.yml") ? read(".github/workflows/deploy-pages.yml") : "";
 const viteConfig = read("vite.config.ts");
+const envExample = read(".env.example");
+const supabaseMigration = read("supabase/migrations/20260706000000_museum_artifact_persistence.sql");
+const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
   assert(pkg.scripts?.[script], `Missing package script: ${script}`);
@@ -193,10 +201,54 @@ assert(css.includes(".motion-reveal"), "Missing motion reveal styling");
 assert(viteConfig.includes("GITHUB_ACTIONS"), "Missing GitHub Pages base environment switch");
 assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository base path");
 
+[
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_PUBLISHABLE_KEY"
+].forEach((pattern) => {
+  assert(envExample.includes(pattern), `Missing Supabase env example: ${pattern}`);
+  assert(supabaseClient.includes(pattern), `Missing Supabase client env: ${pattern}`);
+});
+
+[
+  "createClient",
+  "SUPABASE_ARTIFACT_BUCKET",
+  "artifact-images",
+  "sb_publishable_"
+].forEach((pattern) => {
+  assert(supabaseClient.includes(pattern), `Missing Supabase client pattern: ${pattern}`);
+});
+
+[
+  "create table if not exists public.artifacts",
+  "create table if not exists public.museum_admins",
+  "enable row level security",
+  "public can read artifacts",
+  "museum admins can insert artifacts",
+  "storage.buckets",
+  "storage.objects"
+].forEach((pattern) => {
+  assert(supabaseMigration.includes(pattern), `Missing Supabase migration pattern: ${pattern}`);
+});
+
+[
+  "public.museum_admins",
+  "artifact-images",
+  "npm run build",
+  "Do not use `sb_secret_...`"
+].forEach((pattern) => {
+  assert(supabaseRunbook.includes(pattern), `Missing Supabase runbook pattern: ${pattern}`);
+});
+
 assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 
 [
   "mxren-museum.local-artifacts.v1",
+  "loadManagedArtifacts",
+  "loadRemoteArtifacts",
+  "createRemoteArtifact",
+  "updateRemoteArtifact",
+  "deleteRemoteArtifact",
+  "signInRemoteUser",
   "createLocalArtifact",
   "updateLocalArtifact",
   "deleteLocalArtifact",
@@ -210,6 +262,10 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 [
   'id="artifact-search"',
   'id="artifact-form"',
+  'id="auth-form"',
+  'id="auth-email"',
+  'id="auth-password"',
+  'id="auth-sign-out"',
   'id="artifact-cover-upload"',
   'id="artifact-gallery-upload"',
   'id="artifact-manager-list"',
@@ -233,6 +289,9 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "handleArtifactSubmit",
   "handleArtifactDelete",
   "handleArtifactEdit",
+  "handleAuthSubmit",
+  "hydrateManagedArtifacts",
+  "createRemoteArtifact",
   "queryArtifacts",
   "loadLocalArtifacts",
   "saveLocalArtifacts",
@@ -254,6 +313,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 
 [
   "management-panel",
+  "auth-panel",
+  "auth-form",
   "artifact-form",
   "upload-preview",
   "manager-list",

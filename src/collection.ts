@@ -17,6 +17,7 @@ export type Artifact = {
     src: string;
     alt: string;
     label: string;
+    storagePath?: string;
   }>;
   palette: {
     from: string;
@@ -26,8 +27,9 @@ export type Artifact = {
   };
   summary: string;
   note: string;
-  source?: "sample" | "local";
+  source?: "sample" | "local" | "remote";
   updatedAt?: string;
+  coverStoragePath?: string;
 };
 
 export const categories: Array<{ id: "all" | ArtifactCategory; label: string }> = [

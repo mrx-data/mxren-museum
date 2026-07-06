@@ -970,6 +970,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .manager-search,
+.auth-panel,
 .artifact-form,
 .manager-list-wrap {
   border: 1px solid rgba(201, 169, 98, 0.2);
@@ -984,6 +985,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .manager-search label,
+.auth-form label span,
 .artifact-form label span,
 .upload-field span,
 .checkbox-field span {
@@ -994,6 +996,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .manager-search input,
+.auth-form input,
 .artifact-form input,
 .artifact-form select,
 .artifact-form textarea {
@@ -1018,6 +1021,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .manager-search input:focus,
+.auth-form input:focus,
 .artifact-form input:focus,
 .artifact-form select:focus,
 .artifact-form textarea:focus {
@@ -1027,11 +1031,34 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   box-shadow: 0 0 0 3px rgba(201, 169, 98, 0.12);
 }
 
+.auth-panel,
 .artifact-form,
 .manager-list-wrap {
   display: grid;
   gap: 20px;
   padding: 22px;
+}
+
+.auth-panel {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid rgba(201, 169, 98, 0.18);
+}
+
+.auth-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.auth-form[hidden],
+.auth-panel [hidden] {
+  display: none;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
 }
 
 .form-heading {
@@ -1387,6 +1414,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   .featured-grid,
   .collection-grid,
   .category-index,
+  .auth-form,
   .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1477,6 +1505,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   .collection-grid,
   .category-index,
   .artifact-ledger,
+  .auth-form,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1517,6 +1546,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   }
 
   .management-panel,
+  .auth-panel,
   .artifact-form,
   .manager-list-wrap {
     padding: 18px;

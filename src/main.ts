@@ -1,15 +1,25 @@
 import "./styles.css";
 import { artifacts as sampleArtifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
 import {
+  createRemoteArtifact,
   createLocalArtifact,
+  deleteRemoteArtifact,
   deleteLocalArtifact,
+  getRemoteUser,
+  isSupabaseConfigured,
+  loadManagedArtifacts,
   loadLocalArtifacts,
+  onRemoteAuthChange,
   queryArtifacts,
   saveLocalArtifacts,
+  signInRemoteUser,
+  signOutRemoteUser,
   updateLocalArtifact,
+  updateRemoteArtifact,
   type ArtifactFormInput,
   type GalleryImageInput,
-  type ManagedArtifact
+  type ManagedArtifact,
+  type PersistenceMode
 } from "./artifact-store";
 import {
   animateArtifactDialog,
@@ -35,10 +45,14 @@ const routeTitles: Record<MuseumRoute, string> = {
 let activeFilter: FilterId = "all";
 let searchQuery = "";
 let dialogClosing = false;
-let localArtifacts: ManagedArtifact[] = loadLocalArtifacts();
+let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
+let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
+let remoteUser: Awaited<ReturnType<typeof getRemoteUser>> = null;
 let editingArtifactId: string | null = null;
 let pendingCoverImage = "";
+let pendingCoverFile: File | null = null;
 let pendingGalleryImages: GalleryImageInput[] = [];
+let pendingGalleryFiles: File[] = [];
 let activeRouteState: RouteState | null = null;
 let activeHash = "";
 let motionRefreshFrame = 0;
@@ -72,8 +86,14 @@ const artifactGalleryUpload = document.querySelector<HTMLInputElement>("#artifac
 const artifactCoverPreview = document.querySelector<HTMLElement>("#artifact-cover-preview");
 const artifactGalleryPreview = document.querySelector<HTMLElement>("#artifact-gallery-preview");
 const artifactManagerList = document.querySelector<HTMLElement>("#artifact-manager-list");
+const artifactManagerListTitle = document.querySelector<HTMLElement>("#manager-list-title");
 const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-manager-status");
 const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
+const authForm = document.querySelector<HTMLFormElement>("#auth-form");
+const authEmail = document.querySelector<HTMLInputElement>("#auth-email");
+const authPassword = document.querySelector<HTMLInputElement>("#auth-password");
+const authSignOut = document.querySelector<HTMLButtonElement>("#auth-sign-out");
+const authStatus = document.querySelector<HTMLElement>("#auth-status");
 const pageElements = Array.from(document.querySelectorAll<HTMLElement>("[data-page]"));
 const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".site-nav [data-nav-route]"));
 const routeLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
@@ -219,7 +239,7 @@ function navigateToHash(hash: string) {
 }
 
 function allArtifacts() {
-  return [...sampleArtifacts, ...localArtifacts];
+  return [...sampleArtifacts, ...managedArtifacts];
 }
 
 function artifactNumber(artifact: Artifact) {
@@ -228,13 +248,35 @@ function artifactNumber(artifact: Artifact) {
 }
 
 function persistLocalArtifacts() {
-  saveLocalArtifacts(localArtifacts);
+  saveLocalArtifacts(managedArtifacts);
 }
 
 function showManagerStatus(message: string, tone: "neutral" | "success" | "danger" = "neutral") {
   if (!artifactManagerStatus) return;
   artifactManagerStatus.textContent = message;
   artifactManagerStatus.dataset.tone = tone;
+}
+
+function showAuthStatus(message: string, tone: "neutral" | "success" | "danger" = "neutral") {
+  if (!authStatus) return;
+  authStatus.textContent = message;
+  authStatus.dataset.tone = tone;
+}
+
+function renderAuthState() {
+  if (!authForm || !authSignOut) return;
+
+  if (!isSupabaseConfigured()) {
+    authForm.hidden = true;
+    authSignOut.hidden = true;
+    showAuthStatus("supabase not configured");
+    return;
+  }
+
+  const isSignedIn = Boolean(remoteUser);
+  authForm.hidden = isSignedIn;
+  authSignOut.hidden = !isSignedIn;
+  showAuthStatus(isSignedIn ? `signed in: ${remoteUser?.email ?? "admin"}` : "supabase sign in");
 }
 
 function refreshMuseumView() {
@@ -246,6 +288,21 @@ function refreshMuseumView() {
   renderCollection();
   renderManagerList();
   scheduleMuseumScrollRefresh();
+}
+
+async function refreshRemoteUser() {
+  remoteUser = await getRemoteUser();
+  renderAuthState();
+}
+
+async function hydrateManagedArtifacts() {
+  showManagerStatus(isSupabaseConfigured() ? "正在连接 Supabase" : "browser-local storage");
+  const result = await loadManagedArtifacts();
+  persistenceMode = result.mode;
+  managedArtifacts = result.artifacts;
+  showManagerStatus(result.message, result.error ? "danger" : result.mode === "supabase" ? "success" : "neutral");
+  refreshMuseumView();
+  await refreshRemoteUser();
 }
 
 function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
@@ -516,6 +573,7 @@ async function handleCoverUpload(event: Event) {
   if (!file) return;
 
   try {
+    pendingCoverFile = file;
     pendingCoverImage = await readImageFileAsDataUrl(file);
     renderUploadPreviews();
     showManagerStatus("封面已载入", "success");
@@ -530,6 +588,7 @@ async function handleGalleryUpload(event: Event) {
   if (files.length === 0) return;
 
   try {
+    pendingGalleryFiles = files;
     const sources = await Promise.all(files.map((file) => readImageFileAsDataUrl(file)));
     const title = artifactFormTitle?.value.trim() || "本地藏品";
     pendingGalleryImages = sources.map((src, index) => ({
@@ -542,6 +601,52 @@ async function handleGalleryUpload(event: Event) {
   } catch {
     showManagerStatus("图片读取失败，请换一张图片", "danger");
   }
+}
+
+async function handleAuthSubmit(event: SubmitEvent) {
+  event.preventDefault();
+  const email = authEmail?.value.trim() ?? "";
+  const password = authPassword?.value ?? "";
+
+  if (!email || !password) {
+    showAuthStatus("请输入邮箱和密码", "danger");
+    return;
+  }
+
+  try {
+    showAuthStatus("正在登录");
+    remoteUser = await signInRemoteUser(email, password);
+    renderAuthState();
+    showManagerStatus("supabase cloud storage", "success");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    showAuthStatus(`登录失败：${detail}`, "danger");
+  }
+}
+
+async function handleAuthSignOut() {
+  try {
+    await signOutRemoteUser();
+    remoteUser = null;
+    renderAuthState();
+    showManagerStatus(persistenceMode === "supabase" ? "supabase cloud storage" : "browser-local storage");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    showAuthStatus(`退出失败：${detail}`, "danger");
+  }
+}
+
+function bindAuthEvents() {
+  authForm?.addEventListener("submit", (event) => {
+    void handleAuthSubmit(event);
+  });
+  authSignOut?.addEventListener("click", () => {
+    void handleAuthSignOut();
+  });
+  onRemoteAuthChange((user) => {
+    remoteUser = user;
+    renderAuthState();
+  });
 }
 
 function artifactFormInput(): ArtifactFormInput | null {
@@ -570,7 +675,9 @@ function artifactFormInput(): ArtifactFormInput | null {
     featured: artifactFormFeatured?.checked ?? false,
     coverImage: pendingCoverImage,
     coverAlt: `${title} 的藏品封面`,
+    coverFile: pendingCoverFile,
     galleryImages: pendingGalleryImages,
+    galleryFiles: pendingGalleryFiles,
     summary: artifactFormSummary?.value.trim() ?? "",
     note: artifactFormNote?.value.trim() ?? ""
   };
@@ -581,10 +688,12 @@ function resetArtifactForm() {
   if (artifactFormId) artifactFormId.value = "";
   editingArtifactId = null;
   pendingCoverImage = "";
+  pendingCoverFile = null;
   pendingGalleryImages = [];
+  pendingGalleryFiles = [];
   if (artifactFormHeading) artifactFormHeading.textContent = "新增藏品";
   renderUploadPreviews();
-  showManagerStatus("browser-local storage");
+  showManagerStatus(persistenceMode === "supabase" ? "supabase cloud storage" : "browser-local storage");
 }
 
 export async function handleArtifactSubmit(event: SubmitEvent) {
@@ -594,29 +703,48 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
 
   try {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
-    if (editingArtifactId) {
-      localArtifacts = updateLocalArtifact(editingArtifactId, input, localArtifacts);
+    if (persistenceMode === "supabase") {
+      if (!remoteUser) {
+        showManagerStatus("请先登录 Supabase，再保存云端藏品", "danger");
+        authEmail?.focus();
+        return;
+      }
+
+      if (editingArtifactId) {
+        const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, remoteUser);
+        managedArtifacts = managedArtifacts.map((artifact) => (artifact.id === editingArtifactId ? updated : artifact));
+      } else {
+        const created = await createRemoteArtifact(input, allArtifacts(), remoteUser);
+        managedArtifacts = [...managedArtifacts, created];
+      }
     } else {
-      const created = createLocalArtifact(input, allArtifacts());
-      localArtifacts = [...localArtifacts, created];
+      if (editingArtifactId) {
+        managedArtifacts = updateLocalArtifact(editingArtifactId, input, managedArtifacts);
+      } else {
+        const created = createLocalArtifact(input, allArtifacts());
+        managedArtifacts = [...managedArtifacts, created];
+      }
+      persistLocalArtifacts();
     }
 
-    persistLocalArtifacts();
     resetArtifactForm();
     showManagerStatus(successMessage, "success");
     refreshMuseumView();
-  } catch {
-    showManagerStatus("浏览器存储空间不足，藏品未保存", "danger");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    showManagerStatus(`藏品未保存：${detail}`, "danger");
   }
 }
 
 export function handleArtifactEdit(id: string) {
-  const artifact = localArtifacts.find((item) => item.id === id);
+  const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
 
   editingArtifactId = artifact.id;
   pendingCoverImage = artifact.coverImage;
+  pendingCoverFile = null;
   pendingGalleryImages = artifact.galleryImages.map((image) => ({ ...image }));
+  pendingGalleryFiles = [];
 
   if (artifactFormId) artifactFormId.value = artifact.id;
   if (artifactFormTitle) artifactFormTitle.value = artifact.title;
@@ -634,32 +762,51 @@ export function handleArtifactEdit(id: string) {
   artifactForm?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function handleArtifactDelete(id: string) {
-  const artifact = localArtifacts.find((item) => item.id === id);
+export async function handleArtifactDelete(id: string) {
+  const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
 
-  if (!globalThis.confirm(`删除本地藏品「${artifact.title}」？`)) return;
+  if (!globalThis.confirm(`删除藏品「${artifact.title}」？`)) return;
 
-  localArtifacts = deleteLocalArtifact(id, localArtifacts);
-  persistLocalArtifacts();
-  if (editingArtifactId === id) resetArtifactForm();
-  showManagerStatus("藏品已删除", "success");
-  refreshMuseumView();
+  try {
+    if (artifact.source === "remote" && persistenceMode === "supabase") {
+      if (!remoteUser) {
+        showManagerStatus("请先登录 Supabase，再删除云端藏品", "danger");
+        authEmail?.focus();
+        return;
+      }
+      await deleteRemoteArtifact(id, artifact);
+      managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
+    } else {
+      managedArtifacts = deleteLocalArtifact(id, managedArtifacts);
+      persistLocalArtifacts();
+    }
+
+    if (editingArtifactId === id) resetArtifactForm();
+    showManagerStatus("藏品已删除", "success");
+    refreshMuseumView();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    showManagerStatus(`删除失败：${detail}`, "danger");
+  }
 }
 
 function renderManagerList() {
   if (!artifactManagerList) return;
+  if (artifactManagerListTitle) {
+    artifactManagerListTitle.textContent = persistenceMode === "supabase" ? "云端藏品" : "本地藏品";
+  }
 
-  if (localArtifacts.length === 0) {
+  if (managedArtifacts.length === 0) {
     const empty = document.createElement("p");
     empty.className = "manager-empty";
-    empty.textContent = "还没有本地新增藏品。";
+    empty.textContent = persistenceMode === "supabase" ? "还没有云端新增藏品。" : "还没有本地新增藏品。";
     artifactManagerList.replaceChildren(empty);
     return;
   }
 
   artifactManagerList.replaceChildren(
-    ...localArtifacts.map((artifact) => {
+    ...managedArtifacts.map((artifact) => {
       const row = document.createElement("article");
       row.className = "manager-row";
 
@@ -685,7 +832,9 @@ function renderManagerList() {
       deleteButton.className = "button button-danger";
       deleteButton.textContent = "删除";
       deleteButton.setAttribute("aria-label", `删除 ${artifact.title}`);
-      deleteButton.addEventListener("click", () => handleArtifactDelete(artifact.id));
+      deleteButton.addEventListener("click", () => {
+        void handleArtifactDelete(artifact.id);
+      });
 
       actions.append(editButton, deleteButton);
       row.append(copy, actions);
@@ -762,11 +911,14 @@ function initMuseum() {
   renderCollection();
   renderManagerList();
   renderUploadPreviews();
+  renderAuthState();
   bindDialogEvents();
   bindManagementEvents();
+  bindAuthEvents();
   bindRouteEvents();
   syncRouteFromHash(false, false);
   initMuseumMotion();
+  void hydrateManagedArtifacts();
 }
 
 initMuseum();
