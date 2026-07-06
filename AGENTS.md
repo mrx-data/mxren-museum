@@ -10,14 +10,14 @@
 - Package manager: npm with `package-lock.json`
 - Asset mode: generated local PNG placeholders under `public/artifacts`
 - Remote management mode: Supabase Auth + Postgres + Storage for user-managed artifacts
-- Local fallback mode: browser-local artifact CRUD/search/upload stored in the current browser profile if Supabase is unavailable
+- Local fallback mode: browser-local managed artifacts can be read from the current browser profile if Supabase is unavailable; new writes stay disabled unless Supabase admin access is verified
 - GitHub repository: `https://github.com/mrx-data/mxren-museum`
 - Production site: `https://mrx-data.github.io/mxren-museum/`
 - Deployment mode: GitHub Pages through `.github/workflows/deploy-pages.yml`
 - Echo Link KB project entry: `/Users/echo/Documents/obsidian-data/echo-link-kb/wiki/projects/mxren-museum/项目首页.md`
 - Codebase index: `/Users/echo/Documents/obsidian-data/echo-link-kb/sources/code/codebase-index.md`
 
-The current version is still served as a static frontend, but user-managed artifacts can persist through Supabase. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local fallback. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
+The current version is still served as a static frontend, but user-managed artifacts can persist through Supabase. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local read fallback. Guest access and non-admin Supabase users are read-only; add/edit/delete controls are enabled only after the signed-in user is verified in `public.museum_admins`. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
 
 ## Commands
 
@@ -53,13 +53,14 @@ Rules:
 - `index.html` contains the semantic shell, font links, major museum sections, and dialog container.
 - `src/collection.ts` owns typed sample artifact data, cover image paths, and three detail gallery image paths per artifact. Replace or expand real collection entries here first.
 - `src/supabase-client.ts` owns Supabase client configuration. It reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, with the current project URL/publishable key as browser-safe defaults.
-- `src/artifact-store.ts` owns Supabase artifact CRUD, Auth sign-in/out helpers, Storage uploads to `artifact-images`, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
-- `src/main.ts` renders the hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
+- `src/artifact-store.ts` owns Supabase artifact CRUD, Auth sign-in/out helpers, admin role lookup through `public.museum_admins`, Storage uploads to `artifact-images`, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
+- `src/main.ts` renders the hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, guest/admin access state, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, opening timeline, scroll reveal, filter refresh, wax-seal loop, desktop-light parallax, and dialog open/close animation.
 - `src/styles.css` owns the Academia/Classical design system: dark mahogany, aged oak, parchment text, polished brass interactions, crimson wax seals, arch-top covers, sepia-to-color transitions, paper texture, vignette, ornate dividers, and responsive layout.
 - The poster exhibition mode is intentional: preserve `#hero-stage-gallery`, `#category-index`, numbered poster cards, and the `No.xxx / 细赏` browsing language unless a new design decision replaces it.
 - `.github/workflows/deploy-pages.yml` runs `npm ci`, `npm run build`, uploads `dist`, and deploys to GitHub Pages.
 - `supabase/migrations/20260706000000_museum_artifact_persistence.sql` creates `public.artifacts`, `public.museum_admins`, RLS policies, the public-readable `artifact-images` bucket, and Storage object policies. Apply it in Supabase before expecting cloud writes.
+- `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` grants authenticated users the RLS-limited ability to check whether their own user ID exists in `public.museum_admins`.
 - To allow writes, create/sign in a Supabase Auth user and insert that user ID into `public.museum_admins`. Public reads are allowed; writes are admin-only via RLS.
 - `public/artifacts/` contains 36 generated local PNG placeholder assets: 1 cover and 3 detail images for each of the 9 sample artifacts.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.
@@ -102,14 +103,16 @@ Minimum browser checks:
 - `document.documentElement` has `motion-ready`, and `[data-motion-ambient]` exists.
 - Section/card scroll reveal reaches a visible end state.
 - All static collection artifacts render and their local cover PNGs load after scroll.
-- Supabase fallback: when the remote schema is unavailable, the app keeps rendering and reports browser-local fallback in the management status.
-- Supabase cloud path: after applying the migration and logging in as a `museum_admins` user, create/edit/delete a managed artifact and confirm the row is in `public.artifacts` and images are in `artifact-images`.
+- Supabase fallback: when the remote schema is unavailable, the app keeps rendering managed data in read-only mode and reports that cloud access is unavailable.
+- Supabase guest path: choose `游客参观`, confirm the app stays read-only and no create/edit/delete controls are exposed.
+- Supabase non-admin path: log in with a Supabase Auth user missing from `museum_admins`, confirm status is read-only and writes stay blocked.
+- Supabase admin path: after applying both migrations and logging in as a `museum_admins` user, create/edit/delete a managed artifact and confirm the row is in `public.artifacts` and images are in `artifact-images`.
 - Category filters update visible cards and `aria-pressed`.
 - Artifact detail dialog opens and closes with Escape.
 - Artifact detail dialog includes cover, ledger metadata, introduction, a three-image strip with loaded local PNGs, and visible motion-ledger items.
 - 390px mobile viewport has no horizontal overflow.
 - Production URL returns HTTP 200, and deployed JS/CSS/PNG assets return HTTP 200.
-- Browser-local fallback: create an artifact with description, cover upload, and detail uploads; search it; edit it; delete it; reload and confirm expected current-browser persistence.
+- Browser-local fallback: when Supabase is unavailable, confirm previously stored browser-local managed artifacts can still render, but new writes remain disabled for guests/non-admin users.
 
 ## Knowledge Write-Back
 
@@ -132,6 +135,6 @@ When a command, stack choice, directory structure, or safety boundary changes, u
 - Do not run production deploys, database migrations, seed scripts, or destructive git commands unless the user explicitly asks.
 - Do not initialize external services, cloud resources, CI, or remote repositories without confirmation.
 - Do not add backend, upload, account, database, or storage features without first updating the requirements and technical solution.
-- Do not describe browser-local uploaded images as cloud uploads. They are data URLs stored in the current browser profile and do not sync across devices.
+- Do not describe browser-local uploaded images as cloud uploads. They are data URLs stored in the current browser profile and do not sync across devices. The current UI does not allow new browser-local writes unless a future technical decision changes the admin fallback policy.
 - Do not treat missing browser smoke tests as a complete UI verification pass.
 - Do not overwrite user files or discard uncommitted changes.

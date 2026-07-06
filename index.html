@@ -128,9 +128,13 @@
               <div class="form-heading">
                 <div>
                   <p class="volume-label">Supabase</p>
-                  <h3 id="auth-title">云端登录</h3>
+                  <h3 id="auth-title">访问身份</h3>
                 </div>
-                <p class="status-line" id="auth-status" aria-live="polite">supabase sign in</p>
+                <p class="status-line" id="auth-status" aria-live="polite">游客只读</p>
+              </div>
+              <div class="auth-segment" role="group" aria-label="选择访问身份">
+                <button id="guest-access" type="button" aria-pressed="true">游客参观</button>
+                <button id="admin-access" type="button" aria-pressed="false">管理员登录</button>
               </div>
               <form id="auth-form" class="auth-form">
                 <label>
@@ -141,12 +145,12 @@
                   <span>密码</span>
                   <input id="auth-password" name="password" type="password" autocomplete="current-password" />
                 </label>
-                <button class="button button-secondary" type="submit">登录</button>
+                <button class="button button-secondary" type="submit">管理员登录</button>
               </form>
-              <button class="button button-secondary" id="auth-sign-out" type="button" hidden>退出登录</button>
+              <button class="button button-secondary" id="auth-sign-out" type="button" hidden>退出管理员</button>
             </div>
 
-            <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading">
+            <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading" hidden>
               <input id="artifact-form-id" name="artifact-form-id" type="hidden" />
               <div class="form-heading">
                 <div>

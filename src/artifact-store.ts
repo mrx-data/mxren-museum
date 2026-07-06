@@ -472,6 +472,20 @@ export async function signOutRemoteUser() {
   if (error) throw new Error(error.message);
 }
 
+export async function isRemoteAdmin(user: User | null) {
+  if (!user || !isSupabaseConfigured()) return false;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("museum_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
+
 export function onRemoteAuthChange(callback: (user: User | null) => void) {
   if (!isSupabaseConfigured()) return () => undefined;
   const supabase = getSupabaseClient();

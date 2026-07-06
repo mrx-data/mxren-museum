@@ -36,6 +36,7 @@ function assert(condition, message) {
   ".github/workflows/deploy-pages.yml",
   "docs/supabase-persistence.md",
   "supabase/migrations/20260706000000_museum_artifact_persistence.sql",
+  "supabase/migrations/20260706010000_museum_admin_role_lookup.sql",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -55,6 +56,7 @@ const deployWorkflow = exists(".github/workflows/deploy-pages.yml") ? read(".git
 const viteConfig = read("vite.config.ts");
 const envExample = read(".env.example");
 const supabaseMigration = read("supabase/migrations/20260706000000_museum_artifact_persistence.sql");
+const supabaseRoleMigration = read("supabase/migrations/20260706010000_museum_admin_role_lookup.sql");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
@@ -91,6 +93,10 @@ assert(html.includes("<nav"), "Missing semantic nav");
 assert(html.includes("<main"), "Missing semantic main");
 assert(html.includes("<dialog"), "Missing artifact detail dialog");
 assert(html.includes("id=\"app\""), "Missing app mount point");
+assert(html.includes("id=\"guest-access\""), "Missing guest access control");
+assert(html.includes("id=\"admin-access\""), "Missing admin access control");
+assert(html.includes("游客参观"), "Missing guest login label");
+assert(html.includes("管理员登录"), "Missing admin login label");
 assert(html.includes("Cormorant+Garamond"), "Missing Cormorant Garamond font link");
 assert(html.includes("Crimson+Pro"), "Missing Crimson Pro font link");
 assert(html.includes("Cinzel"), "Missing Cinzel font link");
@@ -111,12 +117,20 @@ assert(itemCount >= 9, `Expected at least 9 artifacts, found ${itemCount}`);
   "renderFilters",
   "openArtifactDialog",
   "closeArtifactDialog",
-  "dialog-image-strip"
+  "dialog-image-strip",
+  "canManageArtifacts",
+  "requireManageAccess",
+  "isRemoteAdmin",
+  "guestAccessButton",
+  "adminAccessButton"
 ].forEach((functionName) => {
   assert(main.includes(functionName), `Missing interaction function: ${functionName}`);
 });
 
 assert(css.includes("dialog-image-strip"), "Missing dialog image strip styling");
+assert(css.includes(".auth-segment"), "Missing auth segment styling");
+assert(css.includes(".manager-readonly"), "Missing read-only manager badge styling");
+assert(css.includes(".artifact-form[hidden]"), "Missing hidden management form styling");
 
 assert(main.includes("addEventListener(\"click\""), "Missing click interaction wiring");
 assert(main.includes("Escape"), "Missing Escape key dialog handling");
@@ -231,6 +245,13 @@ assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository b
 });
 
 [
+  "grant select on table public.museum_admins to authenticated",
+  "user_id = auth.uid()"
+].forEach((pattern) => {
+  assert(supabaseRoleMigration.includes(pattern), `Missing Supabase admin role migration pattern: ${pattern}`);
+});
+
+[
   "public.museum_admins",
   "artifact-images",
   "npm run build",
@@ -248,6 +269,7 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "createRemoteArtifact",
   "updateRemoteArtifact",
   "deleteRemoteArtifact",
+  "isRemoteAdmin",
   "signInRemoteUser",
   "createLocalArtifact",
   "updateLocalArtifact",
@@ -294,7 +316,6 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "createRemoteArtifact",
   "queryArtifacts",
   "loadLocalArtifacts",
-  "saveLocalArtifacts",
   "Promise.all(files.map",
   ".slice(0, 3)"
 ].forEach((pattern) => {

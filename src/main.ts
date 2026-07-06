@@ -2,19 +2,16 @@ import "./styles.css";
 import { artifacts as sampleArtifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
 import {
   createRemoteArtifact,
-  createLocalArtifact,
   deleteRemoteArtifact,
-  deleteLocalArtifact,
   getRemoteUser,
+  isRemoteAdmin,
   isSupabaseConfigured,
   loadManagedArtifacts,
   loadLocalArtifacts,
   onRemoteAuthChange,
   queryArtifacts,
-  saveLocalArtifacts,
   signInRemoteUser,
   signOutRemoteUser,
-  updateLocalArtifact,
   updateRemoteArtifact,
   type ArtifactFormInput,
   type GalleryImageInput,
@@ -30,6 +27,8 @@ import {
 
 type FilterId = "all" | ArtifactCategory;
 type MuseumRoute = "home" | "collection" | "manage";
+type AuthMode = "guest" | "admin";
+type AccessRole = "guest" | "admin";
 
 interface RouteState {
   route: MuseumRoute;
@@ -48,6 +47,10 @@ let dialogClosing = false;
 let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
 let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
 let remoteUser: Awaited<ReturnType<typeof getRemoteUser>> = null;
+let selectedAuthMode: AuthMode = "guest";
+let accessRole: AccessRole = "guest";
+let isCheckingAdminRole = false;
+let adminRoleError = "";
 let editingArtifactId: string | null = null;
 let pendingCoverImage = "";
 let pendingCoverFile: File | null = null;
@@ -94,6 +97,8 @@ const authEmail = document.querySelector<HTMLInputElement>("#auth-email");
 const authPassword = document.querySelector<HTMLInputElement>("#auth-password");
 const authSignOut = document.querySelector<HTMLButtonElement>("#auth-sign-out");
 const authStatus = document.querySelector<HTMLElement>("#auth-status");
+const guestAccessButton = document.querySelector<HTMLButtonElement>("#guest-access");
+const adminAccessButton = document.querySelector<HTMLButtonElement>("#admin-access");
 const pageElements = Array.from(document.querySelectorAll<HTMLElement>("[data-page]"));
 const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".site-nav [data-nav-route]"));
 const routeLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
@@ -247,10 +252,6 @@ function artifactNumber(artifact: Artifact) {
   return `No.${String(Math.max(index, 0) + 1).padStart(3, "0")}`;
 }
 
-function persistLocalArtifacts() {
-  saveLocalArtifacts(managedArtifacts);
-}
-
 function showManagerStatus(message: string, tone: "neutral" | "success" | "danger" = "neutral") {
   if (!artifactManagerStatus) return;
   artifactManagerStatus.textContent = message;
@@ -263,20 +264,85 @@ function showAuthStatus(message: string, tone: "neutral" | "success" | "danger" 
   authStatus.dataset.tone = tone;
 }
 
-function renderAuthState() {
-  if (!authForm || !authSignOut) return;
+function canManageArtifacts() {
+  return accessRole === "admin" && Boolean(remoteUser) && persistenceMode === "supabase";
+}
 
+function authStatusMessage() {
+  if (!isSupabaseConfigured()) return { message: "游客只读", tone: "neutral" as const };
+  if (isCheckingAdminRole) return { message: "正在核验管理员", tone: "neutral" as const };
+  if (adminRoleError) return { message: adminRoleError, tone: "danger" as const };
+  if (selectedAuthMode === "guest") return { message: "游客只读", tone: "neutral" as const };
+  if (!remoteUser) return { message: "管理员登录", tone: "neutral" as const };
+  if (accessRole === "admin") return { message: `管理员：${remoteUser.email ?? "admin"}`, tone: "success" as const };
+  return { message: "非管理员：只读", tone: "danger" as const };
+}
+
+function managerAccessStatus() {
   if (!isSupabaseConfigured()) {
-    authForm.hidden = true;
-    authSignOut.hidden = true;
-    showAuthStatus("supabase not configured");
-    return;
+    return { message: "游客只读", tone: "neutral" as const };
   }
 
+  if (persistenceMode !== "supabase") {
+    return { message: "云端不可用，只读", tone: "danger" as const };
+  }
+
+  if (canManageArtifacts()) {
+    return { message: "管理员可编辑", tone: "success" as const };
+  }
+
+  if (selectedAuthMode === "admin" && remoteUser) {
+    return { message: "非管理员只读", tone: "danger" as const };
+  }
+
+  if (selectedAuthMode === "admin") {
+    return { message: "等待管理员登录", tone: "neutral" as const };
+  }
+
+  return { message: "游客只读", tone: "neutral" as const };
+}
+
+function setManagementControlsDisabled() {
+  if (!artifactForm) return;
+
+  const canManage = canManageArtifacts();
+  artifactForm.hidden = !canManage;
+  artifactForm
+    .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>(
+      "input, select, textarea, button"
+    )
+    .forEach((control) => {
+      control.disabled = !canManage;
+    });
+}
+
+function renderAuthState(updateManagerStatus = true) {
   const isSignedIn = Boolean(remoteUser);
-  authForm.hidden = isSignedIn;
-  authSignOut.hidden = !isSignedIn;
-  showAuthStatus(isSignedIn ? `signed in: ${remoteUser?.email ?? "admin"}` : "supabase sign in");
+
+  document.body.dataset.accessRole = accessRole;
+  guestAccessButton?.setAttribute("aria-pressed", String(selectedAuthMode === "guest"));
+  adminAccessButton?.setAttribute("aria-pressed", String(selectedAuthMode === "admin"));
+  guestAccessButton?.classList.toggle("is-active", selectedAuthMode === "guest");
+  adminAccessButton?.classList.toggle("is-active", selectedAuthMode === "admin");
+
+  if (authForm && authSignOut) {
+    const canUseAdminLogin = isSupabaseConfigured() && selectedAuthMode === "admin";
+    authForm.hidden = !canUseAdminLogin || isSignedIn;
+    authSignOut.hidden = !isSignedIn;
+    authEmail?.toggleAttribute("disabled", !canUseAdminLogin || isSignedIn);
+    authPassword?.toggleAttribute("disabled", !canUseAdminLogin || isSignedIn);
+  }
+
+  const authStatus = authStatusMessage();
+  showAuthStatus(authStatus.message, authStatus.tone);
+  setManagementControlsDisabled();
+
+  if (updateManagerStatus) {
+    const managerStatus = managerAccessStatus();
+    showManagerStatus(managerStatus.message, managerStatus.tone);
+  }
+
+  renderManagerList();
 }
 
 function refreshMuseumView() {
@@ -290,9 +356,36 @@ function refreshMuseumView() {
   scheduleMuseumScrollRefresh();
 }
 
-async function refreshRemoteUser() {
-  remoteUser = await getRemoteUser();
+async function syncRemoteAccess(user: Awaited<ReturnType<typeof getRemoteUser>>) {
+  remoteUser = user;
+  adminRoleError = "";
+
+  if (!remoteUser) {
+    accessRole = "guest";
+    isCheckingAdminRole = false;
+    renderAuthState();
+    return;
+  }
+
+  selectedAuthMode = "admin";
+  accessRole = "guest";
+  isCheckingAdminRole = true;
   renderAuthState();
+
+  try {
+    accessRole = (await isRemoteAdmin(remoteUser)) ? "admin" : "guest";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    adminRoleError = `管理员核验失败：${detail}`;
+    accessRole = "guest";
+  } finally {
+    isCheckingAdminRole = false;
+    renderAuthState();
+  }
+}
+
+async function refreshRemoteUser() {
+  await syncRemoteAccess(await getRemoteUser());
 }
 
 async function hydrateManagedArtifacts() {
@@ -568,6 +661,8 @@ function renderUploadPreviews() {
 }
 
 async function handleCoverUpload(event: Event) {
+  if (!requireManageAccess("上传封面")) return;
+
   const input = event.currentTarget as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
@@ -583,6 +678,8 @@ async function handleCoverUpload(event: Event) {
 }
 
 async function handleGalleryUpload(event: Event) {
+  if (!requireManageAccess("上传详情图片")) return;
+
   const input = event.currentTarget as HTMLInputElement;
   const files = Array.from(input.files ?? []).slice(0, 3);
   if (files.length === 0) return;
@@ -615,11 +712,13 @@ async function handleAuthSubmit(event: SubmitEvent) {
 
   try {
     showAuthStatus("正在登录");
-    remoteUser = await signInRemoteUser(email, password);
-    renderAuthState();
-    showManagerStatus("supabase cloud storage", "success");
+    selectedAuthMode = "admin";
+    await syncRemoteAccess(await signInRemoteUser(email, password));
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
+    accessRole = "guest";
+    adminRoleError = "";
+    renderAuthState(false);
     showAuthStatus(`登录失败：${detail}`, "danger");
   }
 }
@@ -628,15 +727,46 @@ async function handleAuthSignOut() {
   try {
     await signOutRemoteUser();
     remoteUser = null;
+    accessRole = "guest";
+    adminRoleError = "";
+    isCheckingAdminRole = false;
+    resetArtifactForm(false);
     renderAuthState();
-    showManagerStatus(persistenceMode === "supabase" ? "supabase cloud storage" : "browser-local storage");
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
     showAuthStatus(`退出失败：${detail}`, "danger");
   }
 }
 
+async function handleGuestAccess() {
+  selectedAuthMode = "guest";
+  adminRoleError = "";
+
+  if (remoteUser) {
+    await handleAuthSignOut();
+    return;
+  }
+
+  accessRole = "guest";
+  isCheckingAdminRole = false;
+  resetArtifactForm(false);
+  renderAuthState();
+}
+
+function handleAdminAccess() {
+  selectedAuthMode = "admin";
+  adminRoleError = "";
+  renderAuthState();
+  if (!remoteUser) {
+    authEmail?.focus();
+  }
+}
+
 function bindAuthEvents() {
+  guestAccessButton?.addEventListener("click", () => {
+    void handleGuestAccess();
+  });
+  adminAccessButton?.addEventListener("click", handleAdminAccess);
   authForm?.addEventListener("submit", (event) => {
     void handleAuthSubmit(event);
   });
@@ -644,9 +774,29 @@ function bindAuthEvents() {
     void handleAuthSignOut();
   });
   onRemoteAuthChange((user) => {
-    remoteUser = user;
-    renderAuthState();
+    void syncRemoteAccess(user);
   });
+}
+
+function requireManageAccess(action: string) {
+  if (canManageArtifacts()) return true;
+
+  selectedAuthMode = "admin";
+  renderAuthState(false);
+
+  if (!remoteUser) {
+    showManagerStatus(`请先以管理员登录，再${action}`, "danger");
+    authEmail?.focus();
+    return false;
+  }
+
+  if (persistenceMode !== "supabase") {
+    showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
+    return false;
+  }
+
+  showManagerStatus(`当前账号不是管理员，不能${action}`, "danger");
+  return false;
 }
 
 function artifactFormInput(): ArtifactFormInput | null {
@@ -683,7 +833,7 @@ function artifactFormInput(): ArtifactFormInput | null {
   };
 }
 
-function resetArtifactForm() {
+function resetArtifactForm(updateStatus = true) {
   artifactForm?.reset();
   if (artifactFormId) artifactFormId.value = "";
   editingArtifactId = null;
@@ -693,23 +843,22 @@ function resetArtifactForm() {
   pendingGalleryFiles = [];
   if (artifactFormHeading) artifactFormHeading.textContent = "新增藏品";
   renderUploadPreviews();
-  showManagerStatus(persistenceMode === "supabase" ? "supabase cloud storage" : "browser-local storage");
+  if (updateStatus) {
+    const managerStatus = managerAccessStatus();
+    showManagerStatus(managerStatus.message, managerStatus.tone);
+  }
 }
 
 export async function handleArtifactSubmit(event: SubmitEvent) {
   event.preventDefault();
+  if (!requireManageAccess("保存藏品")) return;
+
   const input = artifactFormInput();
   if (!input) return;
 
   try {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
-    if (persistenceMode === "supabase") {
-      if (!remoteUser) {
-        showManagerStatus("请先登录 Supabase，再保存云端藏品", "danger");
-        authEmail?.focus();
-        return;
-      }
-
+    if (persistenceMode === "supabase" && remoteUser) {
       if (editingArtifactId) {
         const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, remoteUser);
         managedArtifacts = managedArtifacts.map((artifact) => (artifact.id === editingArtifactId ? updated : artifact));
@@ -718,13 +867,8 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
         managedArtifacts = [...managedArtifacts, created];
       }
     } else {
-      if (editingArtifactId) {
-        managedArtifacts = updateLocalArtifact(editingArtifactId, input, managedArtifacts);
-      } else {
-        const created = createLocalArtifact(input, allArtifacts());
-        managedArtifacts = [...managedArtifacts, created];
-      }
-      persistLocalArtifacts();
+      showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
+      return;
     }
 
     resetArtifactForm();
@@ -737,6 +881,8 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
 }
 
 export function handleArtifactEdit(id: string) {
+  if (!requireManageAccess("修改藏品")) return;
+
   const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
 
@@ -763,6 +909,8 @@ export function handleArtifactEdit(id: string) {
 }
 
 export async function handleArtifactDelete(id: string) {
+  if (!requireManageAccess("删除藏品")) return;
+
   const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
 
@@ -770,16 +918,11 @@ export async function handleArtifactDelete(id: string) {
 
   try {
     if (artifact.source === "remote" && persistenceMode === "supabase") {
-      if (!remoteUser) {
-        showManagerStatus("请先登录 Supabase，再删除云端藏品", "danger");
-        authEmail?.focus();
-        return;
-      }
       await deleteRemoteArtifact(id, artifact);
       managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
     } else {
-      managedArtifacts = deleteLocalArtifact(id, managedArtifacts);
-      persistLocalArtifacts();
+      showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
+      return;
     }
 
     if (editingArtifactId === id) resetArtifactForm();
@@ -793,6 +936,8 @@ export async function handleArtifactDelete(id: string) {
 
 function renderManagerList() {
   if (!artifactManagerList) return;
+  const canManage = canManageArtifacts();
+
   if (artifactManagerListTitle) {
     artifactManagerListTitle.textContent = persistenceMode === "supabase" ? "云端藏品" : "本地藏品";
   }
@@ -820,23 +965,32 @@ function renderManagerList() {
       const actions = document.createElement("div");
       actions.className = "manager-actions";
 
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.className = "button button-secondary";
-      editButton.textContent = "修改";
-      editButton.setAttribute("aria-label", `修改 ${artifact.title}`);
-      editButton.addEventListener("click", () => handleArtifactEdit(artifact.id));
+      if (canManage) {
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = "button button-secondary";
+        editButton.textContent = "修改";
+        editButton.setAttribute("aria-label", `修改 ${artifact.title}`);
+        editButton.addEventListener("click", () => handleArtifactEdit(artifact.id));
 
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.className = "button button-danger";
-      deleteButton.textContent = "删除";
-      deleteButton.setAttribute("aria-label", `删除 ${artifact.title}`);
-      deleteButton.addEventListener("click", () => {
-        void handleArtifactDelete(artifact.id);
-      });
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "button button-danger";
+        deleteButton.textContent = "删除";
+        deleteButton.setAttribute("aria-label", `删除 ${artifact.title}`);
+        deleteButton.addEventListener("click", () => {
+          void handleArtifactDelete(artifact.id);
+        });
 
-      actions.append(editButton, deleteButton);
+        actions.append(editButton, deleteButton);
+        row.append(copy, actions);
+        return row;
+      }
+
+      const badge = document.createElement("span");
+      badge.className = "manager-readonly";
+      badge.textContent = "只读";
+      actions.append(badge);
       row.append(copy, actions);
       return row;
     })
@@ -879,7 +1033,7 @@ function bindManagementEvents() {
   artifactGalleryUpload?.addEventListener("change", (event) => {
     void handleGalleryUpload(event);
   });
-  artifactFormReset?.addEventListener("click", resetArtifactForm);
+  artifactFormReset?.addEventListener("click", () => resetArtifactForm());
 }
 
 function bindRouteEvents() {
