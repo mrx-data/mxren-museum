@@ -280,5 +280,32 @@ export const artifacts: Artifact[] = [
     },
     summary: "把文章、封面和观点一起归档，让作品不只散落在文件夹和发布平台里。",
     note: "后续可以加入原文链接、发布日期、版本和二次编辑记录。"
+  },
+  {
+    id: "black-myth-wukong",
+    title: "黑神话：悟空",
+    category: "games",
+    categoryLabel: "游戏藏品",
+    volume: "X",
+    year: "2024",
+    medium: "Game Cover / Myth Archive",
+    rarity: "东方神话标本",
+    featured: false,
+    symbol: "☄",
+    coverAlt: "一张黑神话悟空竖版封面，悟空站在云雾山崖前",
+    coverImage: "/artifacts/blackMyth.png",
+    galleryImages: [
+      { src: "/artifacts/blackMyth.png", alt: "黑神话悟空的封面图细节", label: "细节" },
+      { src: "/artifacts/blackMyth.png", alt: "黑神话悟空的云雾山崖记忆图", label: "记忆" },
+      { src: "/artifacts/blackMyth.png", alt: "黑神话悟空的馆藏图板", label: "图板" }
+    ],
+    palette: {
+      from: "#14100D",
+      via: "#4D2A1C",
+      to: "#B88A3D",
+      accent: "#D4B872"
+    },
+    summary: "把一次东方神话旅程收进馆藏：山崖、云海、金箍和踏上取经路之前的那一口安静。",
+    note: "后续可继续补充通关进度、最喜欢的章节、关键截图和一句战斗复盘。"
   }
 ];
