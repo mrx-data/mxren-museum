@@ -5,6 +5,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const desktopMotionQuery = window.matchMedia("(min-width: 760px)");
+let scrollMotionContext: gsap.Context | null = null;
 
 function shouldReduceMotion() {
   return reduceMotionQuery.matches;
@@ -18,7 +19,10 @@ function isHiddenByRoute(element: HTMLElement) {
   return element.hidden || element.closest("[hidden]") !== null;
 }
 
-function killMuseumScrollTriggers() {
+function killMuseumScrollAnimations() {
+  scrollMotionContext?.revert();
+  scrollMotionContext = null;
+
   ScrollTrigger.getAll().forEach((trigger) => {
     if (typeof trigger.vars.id === "string" && trigger.vars.id.startsWith("museum-")) {
       trigger.kill();
@@ -109,10 +113,16 @@ function initWaxSealMotion() {
 }
 
 function initSectionTimeline(section: HTMLElement, index: number) {
-  const heading = section.querySelector<HTMLElement>(".section-heading, .note-ledger");
+  const sectionHeading = section.querySelector<HTMLElement>(".section-heading");
+  const noteLedger = section.querySelector<HTMLElement>(".note-ledger");
+  const headingCopy = sectionHeading
+    ? motionElements<HTMLElement>(":scope > .volume-label, :scope > p:not(.volume-label)", sectionHeading)
+    : [];
   const title = section.querySelector<HTMLElement>("[data-motion-title]");
   const items = motionElements<HTMLElement>("[data-motion-item]", section);
-  const images = motionElements<HTMLElement>("[data-motion-image]", section);
+  const images = motionElements<HTMLElement>("[data-motion-image]", section).filter((image) => {
+    return !items.some((item) => item.contains(image));
+  });
 
   const timeline = gsap.timeline({
     scrollTrigger: {
@@ -124,12 +134,16 @@ function initSectionTimeline(section: HTMLElement, index: number) {
     defaults: { ease: "power3.out", immediateRender: false }
   });
 
-  if (heading) {
-    timeline.from(heading, { autoAlpha: 0, y: 28, duration: 0.72 });
+  if (headingCopy.length > 0) {
+    timeline.from(headingCopy, { autoAlpha: 0, y: 24, duration: 0.62, stagger: 0.08 });
   }
 
   if (title) {
-    timeline.from(title, { autoAlpha: 0, y: 30, clipPath: "inset(0 0 100% 0)", duration: 0.74 }, heading ? "-=0.48" : 0);
+    timeline.from(title, { autoAlpha: 0, y: 30, clipPath: "inset(0 0 100% 0)", duration: 0.74 }, headingCopy.length > 0 ? "-=0.32" : 0);
+  }
+
+  if (noteLedger) {
+    timeline.from(noteLedger, { autoAlpha: 0, y: 28, duration: 0.72 }, title ? "-=0.42" : 0);
   }
 
   if (images.length > 0) {
@@ -186,25 +200,27 @@ function initDesktopParallax() {
 }
 
 export function refreshMuseumScrollAnimations() {
-  killMuseumScrollTriggers();
+  killMuseumScrollAnimations();
   resetMotionElements();
 
   if (shouldReduceMotion()) {
     return;
   }
 
-  motionElements<HTMLElement>("[data-motion-item], [data-motion-image], [data-motion-title]").forEach((element) => {
-    element.classList.add("motion-reveal");
-  });
+  scrollMotionContext = gsap.context(() => {
+    motionElements<HTMLElement>("[data-motion-item], [data-motion-image], [data-motion-title]").forEach((element) => {
+      element.classList.add("motion-reveal");
+    });
 
-  motionElements<HTMLElement>("[data-motion-section]").forEach((section, index) => {
-    if (section.matches(".site-header")) return;
-    if (isHiddenByRoute(section)) return;
-    initSectionTimeline(section, index);
-  });
+    motionElements<HTMLElement>("[data-motion-section]").forEach((section, index) => {
+      if (section.matches(".site-header")) return;
+      if (isHiddenByRoute(section)) return;
+      initSectionTimeline(section, index);
+    });
 
-  initDividerTimelines();
-  initDesktopParallax();
+    initDividerTimelines();
+    initDesktopParallax();
+  });
   ScrollTrigger.refresh();
 }
 
