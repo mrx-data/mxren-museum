@@ -16,10 +16,46 @@
       rel="stylesheet"
     />
   </head>
-  <body data-motion-root data-route="home">
+  <body data-motion-root data-route="home" data-access-role="locked">
     <div class="paper-texture" aria-hidden="true"></div>
     <div class="vignette" aria-hidden="true"></div>
     <div class="museum-atmosphere" data-motion-ambient aria-hidden="true"></div>
+
+    <section id="access-gate" class="access-gate" aria-labelledby="access-title" role="dialog" aria-modal="true">
+      <div class="access-gate-panel corner-flourish-large">
+        <div class="access-gate-copy">
+          <p class="volume-label">Private access</p>
+          <h1 id="access-title">私人数字藏馆</h1>
+          <p class="drop-cap">
+            入馆前请选择身份。游客可以细赏馆藏，管理员可以维护云端藏品账册。
+          </p>
+        </div>
+        <div class="access-gate-actions">
+          <button class="button button-primary" id="gate-guest-access" type="button">游客进入</button>
+          <button
+            class="button button-secondary"
+            id="gate-admin-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="gate-auth-form"
+          >
+            管理员登录
+          </button>
+        </div>
+        <form id="gate-auth-form" class="auth-form access-auth-form" hidden>
+          <label>
+            <span>邮箱</span>
+            <input id="gate-auth-email" name="email" type="email" autocomplete="email" />
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="gate-auth-password" name="password" type="password" autocomplete="current-password" />
+          </label>
+          <button class="button button-secondary" type="submit">进入管理</button>
+        </form>
+        <p class="status-line" id="gate-auth-status" aria-live="polite">请选择入馆身份</p>
+      </div>
+    </section>
 
     <div id="app" class="museum-shell">
       <header class="site-header" data-motion-section>
@@ -128,26 +164,11 @@
               <div class="form-heading">
                 <div>
                   <p class="volume-label">Supabase</p>
-                  <h3 id="auth-title">访问身份</h3>
+                  <h3 id="auth-title">当前身份</h3>
                 </div>
-                <p class="status-line" id="auth-status" aria-live="polite">游客只读</p>
+                <p class="status-line" id="auth-status" aria-live="polite">等待入馆</p>
               </div>
-              <div class="auth-segment" role="group" aria-label="选择访问身份">
-                <button id="guest-access" type="button" aria-pressed="true">游客参观</button>
-                <button id="admin-access" type="button" aria-pressed="false">管理员登录</button>
-              </div>
-              <form id="auth-form" class="auth-form">
-                <label>
-                  <span>邮箱</span>
-                  <input id="auth-email" name="email" type="email" autocomplete="email" />
-                </label>
-                <label>
-                  <span>密码</span>
-                  <input id="auth-password" name="password" type="password" autocomplete="current-password" />
-                </label>
-                <button class="button button-secondary" type="submit">管理员登录</button>
-              </form>
-              <button class="button button-secondary" id="auth-sign-out" type="button" hidden>退出管理员</button>
+              <button class="button button-secondary" id="auth-sign-out" type="button" hidden>切换身份</button>
             </div>
 
             <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading" hidden>

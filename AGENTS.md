@@ -4,7 +4,7 @@
 
 - Project name: mxren-museum
 - Code path: `/Users/echo/Documents/work_develop/mxren-museum`
-- Current mode: static frontend application with Supabase persistence
+- Current mode: static frontend application with full-site entry gate and Supabase persistence
 - Product goal: a personal digital museum for collectible games, landscapes, and personal works
 - Tech stack: Vite 8.1.3, TypeScript, HTML, CSS, GSAP 3.15.0, Node.js validation script
 - Package manager: npm with `package-lock.json`
@@ -17,7 +17,7 @@
 - Echo Link KB project entry: `/Users/echo/Documents/obsidian-data/echo-link-kb/wiki/projects/mxren-museum/项目首页.md`
 - Codebase index: `/Users/echo/Documents/obsidian-data/echo-link-kb/sources/code/codebase-index.md`
 
-The current version is still served as a static frontend, but user-managed artifacts can persist through Supabase. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local read fallback. Guest access and non-admin Supabase users are read-only; add/edit/delete controls are enabled only after the signed-in user is verified in `public.museum_admins`. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
+The current version is still served as a static frontend, but the museum is hidden behind a full-site entry gate before any content is visible. Visitors enter with the `游客进入` button and stay read-only in the current browser; admins sign in with Supabase Auth and only receive add/edit/delete access after their user ID is verified in `public.museum_admins`. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local read fallback. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
 
 ## Commands
 
@@ -50,19 +50,19 @@ Rules:
 
 ## Important Implementation Details
 
-- `index.html` contains the semantic shell, font links, major museum sections, and dialog container.
+- `index.html` contains the entry gate, semantic shell, font links, major museum sections, management panel, and dialog container.
 - `src/collection.ts` owns typed sample artifact data, cover image paths, and three detail gallery image paths per artifact. Replace or expand real collection entries here first.
 - `src/supabase-client.ts` owns Supabase client configuration. It reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, with the current project URL/publishable key as browser-safe defaults.
 - `src/artifact-store.ts` owns Supabase artifact CRUD, Auth sign-in/out helpers, admin role lookup through `public.museum_admins`, Storage uploads to `artifact-images`, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
-- `src/main.ts` renders the hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, guest/admin access state, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
+- `src/main.ts` renders the entry gate, hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, locked/guest/admin access state, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, opening timeline, scroll reveal, filter refresh, wax-seal loop, desktop-light parallax, and dialog open/close animation.
 - `src/styles.css` owns the Academia/Classical design system: dark mahogany, aged oak, parchment text, polished brass interactions, crimson wax seals, arch-top covers, sepia-to-color transitions, paper texture, vignette, ornate dividers, and responsive layout.
 - The poster exhibition mode is intentional: preserve `#hero-stage-gallery`, `#category-index`, numbered poster cards, and the `No.xxx / 细赏` browsing language unless a new design decision replaces it.
 - `.github/workflows/deploy-pages.yml` runs `npm ci`, `npm run build`, uploads `dist`, and deploys to GitHub Pages.
 - `supabase/migrations/20260706000000_museum_artifact_persistence.sql` creates `public.artifacts`, `public.museum_admins`, RLS policies, the public-readable `artifact-images` bucket, and Storage object policies. Apply it in Supabase before expecting cloud writes.
 - `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` grants authenticated users the RLS-limited ability to check whether their own user ID exists in `public.museum_admins`.
-- To allow writes, create/sign in a Supabase Auth user and insert that user ID into `public.museum_admins`. Public reads are allowed; writes are admin-only via RLS.
-- `public/artifacts/` contains 36 generated local PNG placeholder assets: 1 cover and 3 detail images for each of the 9 sample artifacts.
+- To allow writes, create or invite a Supabase Auth user from the Dashboard, copy that user's UUID, and insert it into `public.museum_admins`. Do not create admin passwords or service-role flows in frontend code. Public reads are allowed; writes are admin-only via RLS.
+- `public/artifacts/` contains local artifact images for the 10 sample artifacts, including generated PNG placeholders and the user-provided `blackMyth.png` cover.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.
 - The current images are generated placeholders, not user-provided final素材. When real images are added, preserve alt text, arch-top treatment, and the sepia-to-color interaction.
 - Motion must preserve `prefers-reduced-motion: reduce`, keep mobile motion light, and avoid replacing the native `<dialog>` accessibility behavior.
@@ -103,8 +103,10 @@ Minimum browser checks:
 - `document.documentElement` has `motion-ready`, and `[data-motion-ambient]` exists.
 - Section/card scroll reveal reaches a visible end state.
 - All static collection artifacts render and their local cover PNGs load after scroll.
+- Entry gate path: clear `mxren-museum.access-mode.v1`, open the site, confirm only the gate is visible and the museum shell is inert.
+- Guest path: choose `游客进入`, confirm the app stays read-only after refresh and no create/edit/delete controls are exposed.
+- Switch identity path: choose `切换身份` or admin sign-out, confirm the gate returns and guest local state is cleared.
 - Supabase fallback: when the remote schema is unavailable, the app keeps rendering managed data in read-only mode and reports that cloud access is unavailable.
-- Supabase guest path: choose `游客参观`, confirm the app stays read-only and no create/edit/delete controls are exposed.
 - Supabase non-admin path: log in with a Supabase Auth user missing from `museum_admins`, confirm status is read-only and writes stay blocked.
 - Supabase admin path: after applying both migrations and logging in as a `museum_admins` user, create/edit/delete a managed artifact and confirm the row is in `public.artifacts` and images are in `artifact-images`.
 - Category filters update visible cards and `aria-pressed`.

@@ -27,8 +27,7 @@ import {
 
 type FilterId = "all" | ArtifactCategory;
 type MuseumRoute = "home" | "collection" | "manage";
-type AuthMode = "guest" | "admin";
-type AccessRole = "guest" | "admin";
+type AccessRole = "locked" | "guest" | "admin";
 
 interface RouteState {
   route: MuseumRoute;
@@ -41,16 +40,18 @@ const routeTitles: Record<MuseumRoute, string> = {
   manage: "藏品管理 | mxren-museum"
 };
 
+const ACCESS_MODE_STORAGE_KEY = "mxren-museum.access-mode.v1";
+
 let activeFilter: FilterId = "all";
 let searchQuery = "";
 let dialogClosing = false;
 let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
 let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
 let remoteUser: Awaited<ReturnType<typeof getRemoteUser>> = null;
-let selectedAuthMode: AuthMode = "guest";
-let accessRole: AccessRole = "guest";
+let accessRole: AccessRole = loadStoredAccessRole();
 let isCheckingAdminRole = false;
 let adminRoleError = "";
+let gateAdminFormOpen = false;
 let editingArtifactId: string | null = null;
 let pendingCoverImage = "";
 let pendingCoverFile: File | null = null;
@@ -61,6 +62,14 @@ let activeHash = "";
 let motionRefreshFrame = 0;
 const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
+const accessGate = document.querySelector<HTMLElement>("#access-gate");
+const gateGuestAccess = document.querySelector<HTMLButtonElement>("#gate-guest-access");
+const gateAdminToggle = document.querySelector<HTMLButtonElement>("#gate-admin-toggle");
+const gateAuthForm = document.querySelector<HTMLFormElement>("#gate-auth-form");
+const gateAuthEmail = document.querySelector<HTMLInputElement>("#gate-auth-email");
+const gateAuthPassword = document.querySelector<HTMLInputElement>("#gate-auth-password");
+const gateAuthStatus = document.querySelector<HTMLElement>("#gate-auth-status");
+const appShell = document.querySelector<HTMLElement>("#app");
 const artifactCount = document.querySelector<HTMLElement>("#artifact-count");
 const categoryCount = document.querySelector<HTMLElement>("#category-count");
 const heroStageGallery = document.querySelector<HTMLElement>("#hero-stage-gallery");
@@ -92,16 +101,31 @@ const artifactManagerList = document.querySelector<HTMLElement>("#artifact-manag
 const artifactManagerListTitle = document.querySelector<HTMLElement>("#manager-list-title");
 const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-manager-status");
 const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
-const authForm = document.querySelector<HTMLFormElement>("#auth-form");
-const authEmail = document.querySelector<HTMLInputElement>("#auth-email");
-const authPassword = document.querySelector<HTMLInputElement>("#auth-password");
 const authSignOut = document.querySelector<HTMLButtonElement>("#auth-sign-out");
 const authStatus = document.querySelector<HTMLElement>("#auth-status");
-const guestAccessButton = document.querySelector<HTMLButtonElement>("#guest-access");
-const adminAccessButton = document.querySelector<HTMLButtonElement>("#admin-access");
 const pageElements = Array.from(document.querySelectorAll<HTMLElement>("[data-page]"));
 const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".site-nav [data-nav-route]"));
 const routeLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
+
+function accessStorage() {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function loadStoredAccessRole(): AccessRole {
+  return accessStorage()?.getItem(ACCESS_MODE_STORAGE_KEY) === "guest" ? "guest" : "locked";
+}
+
+function storeGuestAccess() {
+  accessStorage()?.setItem(ACCESS_MODE_STORAGE_KEY, "guest");
+}
+
+function clearStoredAccess() {
+  accessStorage()?.removeItem(ACCESS_MODE_STORAGE_KEY);
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => {
@@ -222,6 +246,8 @@ function showRoutePage(routeState: RouteState, shouldScroll = true, shouldRefres
 }
 
 function syncRouteFromHash(shouldScroll = true, shouldRefreshMotion = true) {
+  if (accessRole === "locked") return;
+
   const hash = normalizedCurrentHash();
   const routeState = routeFromHash(hash);
 
@@ -264,21 +290,29 @@ function showAuthStatus(message: string, tone: "neutral" | "success" | "danger" 
   authStatus.dataset.tone = tone;
 }
 
+function showGateStatus(message: string, tone: "neutral" | "success" | "danger" = "neutral") {
+  if (!gateAuthStatus) return;
+  gateAuthStatus.textContent = message;
+  gateAuthStatus.dataset.tone = tone;
+}
+
 function canManageArtifacts() {
   return accessRole === "admin" && Boolean(remoteUser) && persistenceMode === "supabase";
 }
 
 function authStatusMessage() {
-  if (!isSupabaseConfigured()) return { message: "游客只读", tone: "neutral" as const };
+  if (accessRole === "locked") return { message: "等待入馆", tone: "neutral" as const };
   if (isCheckingAdminRole) return { message: "正在核验管理员", tone: "neutral" as const };
   if (adminRoleError) return { message: adminRoleError, tone: "danger" as const };
-  if (selectedAuthMode === "guest") return { message: "游客只读", tone: "neutral" as const };
-  if (!remoteUser) return { message: "管理员登录", tone: "neutral" as const };
-  if (accessRole === "admin") return { message: `管理员：${remoteUser.email ?? "admin"}`, tone: "success" as const };
-  return { message: "非管理员：只读", tone: "danger" as const };
+  if (accessRole === "admin") return { message: `管理员：${remoteUser?.email ?? "admin"}`, tone: "success" as const };
+  return { message: "游客只读", tone: "neutral" as const };
 }
 
 function managerAccessStatus() {
+  if (accessRole === "locked") {
+    return { message: "等待入馆", tone: "neutral" as const };
+  }
+
   if (!isSupabaseConfigured()) {
     return { message: "游客只读", tone: "neutral" as const };
   }
@@ -291,12 +325,8 @@ function managerAccessStatus() {
     return { message: "管理员可编辑", tone: "success" as const };
   }
 
-  if (selectedAuthMode === "admin" && remoteUser) {
+  if (remoteUser) {
     return { message: "非管理员只读", tone: "danger" as const };
-  }
-
-  if (selectedAuthMode === "admin") {
-    return { message: "等待管理员登录", tone: "neutral" as const };
   }
 
   return { message: "游客只读", tone: "neutral" as const };
@@ -317,20 +347,34 @@ function setManagementControlsDisabled() {
 }
 
 function renderAuthState(updateManagerStatus = true) {
-  const isSignedIn = Boolean(remoteUser);
+  const isLocked = accessRole === "locked";
 
   document.body.dataset.accessRole = accessRole;
-  guestAccessButton?.setAttribute("aria-pressed", String(selectedAuthMode === "guest"));
-  adminAccessButton?.setAttribute("aria-pressed", String(selectedAuthMode === "admin"));
-  guestAccessButton?.classList.toggle("is-active", selectedAuthMode === "guest");
-  adminAccessButton?.classList.toggle("is-active", selectedAuthMode === "admin");
 
-  if (authForm && authSignOut) {
-    const canUseAdminLogin = isSupabaseConfigured() && selectedAuthMode === "admin";
-    authForm.hidden = !canUseAdminLogin || isSignedIn;
-    authSignOut.hidden = !isSignedIn;
-    authEmail?.toggleAttribute("disabled", !canUseAdminLogin || isSignedIn);
-    authPassword?.toggleAttribute("disabled", !canUseAdminLogin || isSignedIn);
+  if (accessGate) {
+    accessGate.hidden = !isLocked;
+  }
+
+  if (appShell) {
+    if (isLocked) {
+      appShell.setAttribute("aria-hidden", "true");
+    } else {
+      appShell.removeAttribute("aria-hidden");
+    }
+    (appShell as HTMLElement & { inert?: boolean }).inert = isLocked;
+  }
+
+  if (gateAuthForm && gateAdminToggle) {
+    gateAuthForm.hidden = !isLocked || !gateAdminFormOpen;
+    gateAdminToggle.setAttribute("aria-expanded", String(isLocked && gateAdminFormOpen));
+    gateAdminToggle.disabled = !isSupabaseConfigured();
+    gateAuthEmail?.toggleAttribute("disabled", !isLocked || !gateAdminFormOpen || !isSupabaseConfigured());
+    gateAuthPassword?.toggleAttribute("disabled", !isLocked || !gateAdminFormOpen || !isSupabaseConfigured());
+  }
+
+  if (authSignOut) {
+    authSignOut.hidden = isLocked;
+    authSignOut.textContent = accessRole === "admin" ? "退出管理员" : "切换身份";
   }
 
   const authStatus = authStatusMessage();
@@ -343,6 +387,17 @@ function renderAuthState(updateManagerStatus = true) {
   }
 
   renderManagerList();
+
+  if (isLocked) {
+    activeRouteState = null;
+    activeHash = "";
+    document.title = "进入藏馆 | mxren-museum";
+    showGateStatus(isSupabaseConfigured() ? "请选择入馆身份" : "Supabase 未配置，游客仍可入馆");
+    return;
+  }
+
+  syncRouteFromHash(false, false);
+  scheduleMuseumScrollRefresh();
 }
 
 function refreshMuseumView() {
@@ -361,23 +416,30 @@ async function syncRemoteAccess(user: Awaited<ReturnType<typeof getRemoteUser>>)
   adminRoleError = "";
 
   if (!remoteUser) {
-    accessRole = "guest";
+    accessRole = loadStoredAccessRole();
     isCheckingAdminRole = false;
     renderAuthState();
     return;
   }
 
-  selectedAuthMode = "admin";
   accessRole = "guest";
   isCheckingAdminRole = true;
+  gateAdminFormOpen = false;
   renderAuthState();
 
   try {
     accessRole = (await isRemoteAdmin(remoteUser)) ? "admin" : "guest";
+    clearStoredAccess();
+    if (accessRole === "admin") {
+      showGateStatus("管理员已入馆", "success");
+    } else {
+      showGateStatus("非管理员账号，已以游客身份入馆", "danger");
+    }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
     adminRoleError = `管理员核验失败：${detail}`;
     accessRole = "guest";
+    showGateStatus(adminRoleError, "danger");
   } finally {
     isCheckingAdminRole = false;
     renderAuthState();
@@ -700,36 +762,41 @@ async function handleGalleryUpload(event: Event) {
   }
 }
 
-async function handleAuthSubmit(event: SubmitEvent) {
+async function handleGateAdminSubmit(event: SubmitEvent) {
   event.preventDefault();
-  const email = authEmail?.value.trim() ?? "";
-  const password = authPassword?.value ?? "";
+  const email = gateAuthEmail?.value.trim() ?? "";
+  const password = gateAuthPassword?.value ?? "";
 
   if (!email || !password) {
-    showAuthStatus("请输入邮箱和密码", "danger");
+    showGateStatus("请输入管理员邮箱和密码", "danger");
     return;
   }
 
   try {
-    showAuthStatus("正在登录");
-    selectedAuthMode = "admin";
+    showGateStatus("正在登录");
+    clearStoredAccess();
     await syncRemoteAccess(await signInRemoteUser(email, password));
+    if (gateAuthPassword) gateAuthPassword.value = "";
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
-    accessRole = "guest";
+    accessRole = "locked";
     adminRoleError = "";
     renderAuthState(false);
-    showAuthStatus(`登录失败：${detail}`, "danger");
+    showGateStatus(`登录失败：${detail}`, "danger");
   }
 }
 
-async function handleAuthSignOut() {
+async function handleSwitchIdentity() {
   try {
-    await signOutRemoteUser();
+    if (remoteUser) {
+      await signOutRemoteUser();
+    }
     remoteUser = null;
-    accessRole = "guest";
+    accessRole = "locked";
     adminRoleError = "";
     isCheckingAdminRole = false;
+    gateAdminFormOpen = false;
+    clearStoredAccess();
     resetArtifactForm(false);
     renderAuthState();
   } catch (error) {
@@ -738,40 +805,41 @@ async function handleAuthSignOut() {
   }
 }
 
-async function handleGuestAccess() {
-  selectedAuthMode = "guest";
+async function handleGateGuestAccess() {
   adminRoleError = "";
 
   if (remoteUser) {
-    await handleAuthSignOut();
-    return;
+    await signOutRemoteUser();
+    remoteUser = null;
   }
 
   accessRole = "guest";
+  gateAdminFormOpen = false;
   isCheckingAdminRole = false;
+  storeGuestAccess();
   resetArtifactForm(false);
+  showGateStatus("游客已入馆", "success");
   renderAuthState();
 }
 
-function handleAdminAccess() {
-  selectedAuthMode = "admin";
-  adminRoleError = "";
+function handleGateAdminToggle() {
+  gateAdminFormOpen = !gateAdminFormOpen;
   renderAuthState();
-  if (!remoteUser) {
-    authEmail?.focus();
+  if (gateAdminFormOpen) {
+    gateAuthEmail?.focus();
   }
 }
 
 function bindAuthEvents() {
-  guestAccessButton?.addEventListener("click", () => {
-    void handleGuestAccess();
+  gateGuestAccess?.addEventListener("click", () => {
+    void handleGateGuestAccess();
   });
-  adminAccessButton?.addEventListener("click", handleAdminAccess);
-  authForm?.addEventListener("submit", (event) => {
-    void handleAuthSubmit(event);
+  gateAdminToggle?.addEventListener("click", handleGateAdminToggle);
+  gateAuthForm?.addEventListener("submit", (event) => {
+    void handleGateAdminSubmit(event);
   });
   authSignOut?.addEventListener("click", () => {
-    void handleAuthSignOut();
+    void handleSwitchIdentity();
   });
   onRemoteAuthChange((user) => {
     void syncRemoteAccess(user);
@@ -781,12 +849,16 @@ function bindAuthEvents() {
 function requireManageAccess(action: string) {
   if (canManageArtifacts()) return true;
 
-  selectedAuthMode = "admin";
   renderAuthState(false);
 
+  if (accessRole === "locked") {
+    showGateStatus(`请先入馆，再${action}`, "danger");
+    gateGuestAccess?.focus();
+    return false;
+  }
+
   if (!remoteUser) {
-    showManagerStatus(`请先以管理员登录，再${action}`, "danger");
-    authEmail?.focus();
+    showManagerStatus(`请切换为管理员身份，再${action}`, "danger");
     return false;
   }
 
@@ -1070,7 +1142,6 @@ function initMuseum() {
   bindManagementEvents();
   bindAuthEvents();
   bindRouteEvents();
-  syncRouteFromHash(false, false);
   initMuseumMotion();
   void hydrateManagedArtifacts();
 }

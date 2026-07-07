@@ -93,10 +93,13 @@ assert(html.includes("<nav"), "Missing semantic nav");
 assert(html.includes("<main"), "Missing semantic main");
 assert(html.includes("<dialog"), "Missing artifact detail dialog");
 assert(html.includes("id=\"app\""), "Missing app mount point");
-assert(html.includes("id=\"guest-access\""), "Missing guest access control");
-assert(html.includes("id=\"admin-access\""), "Missing admin access control");
-assert(html.includes("游客参观"), "Missing guest login label");
+assert(html.includes("id=\"access-gate\""), "Missing access gate");
+assert(html.includes("id=\"gate-guest-access\""), "Missing gate guest access control");
+assert(html.includes("id=\"gate-admin-toggle\""), "Missing gate admin toggle");
+assert(html.includes("id=\"gate-auth-form\""), "Missing gate admin login form");
+assert(html.includes("游客进入"), "Missing guest entry label");
 assert(html.includes("管理员登录"), "Missing admin login label");
+assert(html.includes("data-access-role=\"locked\""), "Missing default locked access role");
 assert(html.includes("Cormorant+Garamond"), "Missing Cormorant Garamond font link");
 assert(html.includes("Crimson+Pro"), "Missing Crimson Pro font link");
 assert(html.includes("Cinzel"), "Missing Cinzel font link");
@@ -121,14 +124,17 @@ assert(itemCount >= 9, `Expected at least 9 artifacts, found ${itemCount}`);
   "canManageArtifacts",
   "requireManageAccess",
   "isRemoteAdmin",
-  "guestAccessButton",
-  "adminAccessButton"
+  "ACCESS_MODE_STORAGE_KEY",
+  "handleGateGuestAccess",
+  "handleGateAdminSubmit",
+  "handleSwitchIdentity"
 ].forEach((functionName) => {
   assert(main.includes(functionName), `Missing interaction function: ${functionName}`);
 });
 
 assert(css.includes("dialog-image-strip"), "Missing dialog image strip styling");
-assert(css.includes(".auth-segment"), "Missing auth segment styling");
+assert(css.includes(".access-gate"), "Missing access gate styling");
+assert(css.includes('body[data-access-role="locked"]'), "Missing locked access styling");
 assert(css.includes(".manager-readonly"), "Missing read-only manager badge styling");
 assert(css.includes(".artifact-form[hidden]"), "Missing hidden management form styling");
 
@@ -284,9 +290,9 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 [
   'id="artifact-search"',
   'id="artifact-form"',
-  'id="auth-form"',
-  'id="auth-email"',
-  'id="auth-password"',
+  'id="gate-auth-form"',
+  'id="gate-auth-email"',
+  'id="gate-auth-password"',
   'id="auth-sign-out"',
   'id="artifact-cover-upload"',
   'id="artifact-gallery-upload"',
@@ -311,7 +317,9 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "handleArtifactSubmit",
   "handleArtifactDelete",
   "handleArtifactEdit",
-  "handleAuthSubmit",
+  "handleGateGuestAccess",
+  "handleGateAdminSubmit",
+  "handleSwitchIdentity",
   "hydrateManagedArtifacts",
   "createRemoteArtifact",
   "queryArtifacts",
