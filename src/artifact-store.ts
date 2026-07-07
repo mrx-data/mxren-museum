@@ -1,8 +1,8 @@
-import type { User } from "@supabase/supabase-js";
 import { categories, type Artifact, type ArtifactCategory } from "./collection";
-import { getSupabaseClient, isSupabaseConfigured, SUPABASE_ARTIFACT_BUCKET } from "./supabase-client";
+import { getSupabaseClient, isSupabaseConfigured } from "./supabase-client";
 
 export const LOCAL_ARTIFACT_STORAGE_KEY = "mxren-museum.local-artifacts.v1";
+export const ADMIN_SESSION_STORAGE_KEY = "mxren-museum.admin-session.v1";
 export { isSupabaseConfigured };
 
 export type ManagedSource = "local" | "remote";
@@ -40,6 +40,13 @@ export type ManagedArtifact = Artifact & {
   ownerId?: string;
 };
 
+export type AdminSession = {
+  username: string;
+  displayName: string;
+  token: string;
+  expiresAt: string;
+};
+
 export type ArtifactLoadResult = {
   artifacts: ManagedArtifact[];
   mode: PersistenceMode;
@@ -69,6 +76,13 @@ type ArtifactRow = {
   summary: string | null;
   note: string | null;
   updated_at: string | null;
+};
+
+type AdminLoginRow = {
+  username: string;
+  display_name: string | null;
+  token: string;
+  expires_at: string;
 };
 
 const defaultGalleryLabels = ["细节", "记忆", "图板"];
@@ -280,10 +294,10 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
   };
 }
 
-function rowFromArtifact(artifact: ManagedArtifact, ownerId: string) {
+function rowFromArtifact(artifact: ManagedArtifact) {
   return {
     id: artifact.id,
-    owner_id: ownerId,
+    owner_id: artifact.ownerId ?? null,
     title: artifact.title,
     category: artifact.category,
     category_label: artifact.categoryLabel,
@@ -301,72 +315,6 @@ function rowFromArtifact(artifact: ManagedArtifact, ownerId: string) {
     summary: artifact.summary,
     note: artifact.note
   };
-}
-
-function safeFileName(file: File) {
-  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
-  const base = file.name.replace(/\.[^.]+$/, "");
-  return `${slugify(base)}.${extension}`;
-}
-
-async function uploadArtifactImage(user: User, artifactId: string, kind: string, file: File, index = 0) {
-  const supabase = getSupabaseClient();
-  const path = `${user.id}/${artifactId}/${Date.now()}-${kind}-${index}-${safeFileName(file)}`;
-  const { error } = await supabase.storage.from(SUPABASE_ARTIFACT_BUCKET).upload(path, file, {
-    cacheControl: "31536000",
-    contentType: file.type || "application/octet-stream",
-    upsert: true
-  });
-
-  if (error) throw new Error(error.message);
-
-  const { data } = supabase.storage.from(SUPABASE_ARTIFACT_BUCKET).getPublicUrl(path);
-  return { src: data.publicUrl, storagePath: path };
-}
-
-async function coverFromInput(input: ArtifactFormInput, user: User, artifactId: string) {
-  if (!input.coverFile) {
-    return {
-      src: normalizeText(input.coverImage ?? ""),
-      storagePath: normalizeText(input.coverStoragePath ?? "") || undefined
-    };
-  }
-
-  return uploadArtifactImage(user, artifactId, "cover", input.coverFile);
-}
-
-async function galleryFromInput(input: ArtifactFormInput, user: User, artifactId: string) {
-  const normalized = normalizeGalleryImages(input);
-  const files = input.galleryFiles ?? [];
-  const count = Math.max(normalized.length, files.length);
-  const gallery: GalleryImageInput[] = [];
-
-  for (let index = 0; index < Math.min(count, 3); index += 1) {
-    const current = normalized[index];
-    const file = files[index];
-    if (file) {
-      const uploaded = await uploadArtifactImage(user, artifactId, "gallery", file, index + 1);
-      gallery.push({
-        src: uploaded.src,
-        alt: current?.alt || `${normalizeText(input.title)} 的详情图片 ${index + 1}`,
-        label: current?.label || defaultGalleryLabels[index] || `图 ${index + 1}`,
-        storagePath: uploaded.storagePath
-      });
-      continue;
-    }
-
-    if (current) gallery.push(current);
-  }
-
-  return gallery;
-}
-
-function collectStoragePaths(artifact?: ManagedArtifact) {
-  if (!artifact) return [];
-  return [
-    artifact.coverStoragePath,
-    ...artifact.galleryImages.map((image) => image.storagePath)
-  ].filter((path): path is string => Boolean(path));
 }
 
 export function loadLocalArtifacts(storage?: Storage): ManagedArtifact[] {
@@ -391,6 +339,45 @@ export function saveLocalArtifacts(artifacts: ManagedArtifact[], storage?: Stora
     .filter((artifact) => artifact.source === "local")
     .map((artifact) => ({ ...artifact, source: "local" }));
   target.setItem(LOCAL_ARTIFACT_STORAGE_KEY, JSON.stringify(stored));
+}
+
+export function loadStoredAdminSession(storage?: Storage): AdminSession | null {
+  const target = getStorage(storage);
+  if (!target) return null;
+
+  try {
+    const raw = target.getItem(ADMIN_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+
+    const session: AdminSession = {
+      username: typeof parsed.username === "string" ? parsed.username : "",
+      displayName: typeof parsed.displayName === "string" ? parsed.displayName : "",
+      token: typeof parsed.token === "string" ? parsed.token : "",
+      expiresAt: typeof parsed.expiresAt === "string" ? parsed.expiresAt : ""
+    };
+
+    if (!session.username || !session.token || !session.expiresAt) return null;
+    if (Date.parse(session.expiresAt) <= Date.now()) {
+      target.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      return null;
+    }
+
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+export function storeAdminSession(session: AdminSession, storage?: Storage) {
+  const target = getStorage(storage);
+  if (!target) return;
+  target.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+export function clearStoredAdminSession(storage?: Storage) {
+  getStorage(storage)?.removeItem(ADMIN_SESSION_STORAGE_KEY);
 }
 
 export function createLocalArtifact(input: ArtifactFormInput, existing: Artifact[]): ManagedArtifact {
@@ -452,71 +439,72 @@ export async function loadManagedArtifacts(storage?: Storage): Promise<ArtifactL
 }
 
 export async function getRemoteUser() {
-  if (!isSupabaseConfigured()) return null;
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return null;
-  return data.user;
+  return loadStoredAdminSession();
 }
 
-export async function signInRemoteUser(email: string, password: string) {
+export async function signInRemoteUser(username: string, password: string) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.rpc("verify_museum_admin_login", {
+    input_username: username,
+    input_password: password
+  });
   if (error) throw new Error(error.message);
-  return data.user;
+
+  const row = Array.isArray(data) ? (data[0] as AdminLoginRow | undefined) : (data as AdminLoginRow | null);
+  if (!row?.token) throw new Error("管理员账号或密码错误");
+
+  const session = {
+    username: row.username,
+    displayName: row.display_name?.trim() || row.username,
+    token: row.token,
+    expiresAt: row.expires_at
+  };
+  storeAdminSession(session);
+  return session;
 }
 
-export async function signOutRemoteUser() {
+export async function signOutRemoteUser(session?: AdminSession | null) {
+  const currentSession = session ?? loadStoredAdminSession();
   const supabase = getSupabaseClient();
-  const { error } = await supabase.auth.signOut();
-  if (error) throw new Error(error.message);
+  if (currentSession?.token) {
+    const { error } = await supabase.rpc("clear_museum_admin_session", {
+      input_session_token: currentSession.token
+    });
+    if (error) throw new Error(error.message);
+  }
+  clearStoredAdminSession();
 }
 
-export async function isRemoteAdmin(user: User | null) {
-  if (!user || !isSupabaseConfigured()) return false;
+export async function isRemoteAdmin(session: AdminSession | null) {
+  if (!session || !isSupabaseConfigured()) return false;
 
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("museum_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
+  const { data, error } = await supabase.rpc("verify_museum_admin_session", {
+    input_session_token: session.token
+  });
   if (error) throw new Error(error.message);
   return Boolean(data);
 }
 
-export function onRemoteAuthChange(callback: (user: User | null) => void) {
-  if (!isSupabaseConfigured()) return () => undefined;
-  const supabase = getSupabaseClient();
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session?.user ?? null);
-  });
-
-  return () => data.subscription.unsubscribe();
+export function onRemoteAuthChange(_callback: (session: AdminSession | null) => void) {
+  return () => undefined;
 }
 
 export async function createRemoteArtifact(
   input: ArtifactFormInput,
   existing: Artifact[],
-  user: User
+  session: AdminSession
 ): Promise<ManagedArtifact> {
   const supabase = getSupabaseClient();
   const id = input.id ?? remoteId();
-  const cover = await coverFromInput(input, user, id);
-  const galleryImages = await galleryFromInput(input, user, id);
   const artifact = artifactFromInput(input, existing, id, "remote", {
-    coverImage: cover.src,
-    coverStoragePath: cover.storagePath,
-    galleryImages,
-    ownerId: user.id
+    galleryImages: normalizeGalleryImages(input)
   });
 
-  const { data, error } = await supabase
-    .from("artifacts")
-    .insert(rowFromArtifact(artifact, user.id))
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("create_museum_artifact", {
+    input_session_token: session.token,
+    artifact_row: rowFromArtifact(artifact)
+  });
 
   if (error) throw new Error(error.message);
   return artifactFromRow(data as ArtifactRow);
@@ -526,40 +514,32 @@ export async function updateRemoteArtifact(
   id: string,
   input: ArtifactFormInput,
   existing: ManagedArtifact[],
-  user: User
+  session: AdminSession
 ): Promise<ManagedArtifact> {
   const supabase = getSupabaseClient();
   const current = existing.find((artifact) => artifact.id === id);
-  const cover = await coverFromInput(input, user, id);
-  const galleryImages = await galleryFromInput(input, user, id);
   const artifact = artifactFromInput(input, existing, id, "remote", {
-    coverImage: cover.src,
-    coverStoragePath: cover.storagePath,
-    galleryImages,
-    ownerId: user.id,
+    galleryImages: normalizeGalleryImages(input),
     volume: current?.volume
   });
 
-  const { data, error } = await supabase
-    .from("artifacts")
-    .update(rowFromArtifact(artifact, user.id))
-    .eq("id", id)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("update_museum_artifact", {
+    input_session_token: session.token,
+    artifact_id: id,
+    artifact_row: rowFromArtifact(artifact)
+  });
 
   if (error) throw new Error(error.message);
   return artifactFromRow(data as ArtifactRow);
 }
 
-export async function deleteRemoteArtifact(id: string, artifact?: ManagedArtifact) {
+export async function deleteRemoteArtifact(id: string, session: AdminSession) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("artifacts").delete().eq("id", id);
+  const { error } = await supabase.rpc("delete_museum_artifact", {
+    input_session_token: session.token,
+    artifact_id: id
+  });
   if (error) throw new Error(error.message);
-
-  const storagePaths = collectStoragePaths(artifact);
-  if (storagePaths.length > 0) {
-    await supabase.storage.from(SUPABASE_ARTIFACT_BUCKET).remove(storagePaths);
-  }
 }
 
 export function queryArtifacts(

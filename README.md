@@ -18,9 +18,9 @@ npm run preview
 - Static Vite + TypeScript frontend.
 - Local sample collection data in `src/collection.ts`.
 - Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
-- Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres + Storage.
-- Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with Supabase Auth.
-- Guest access is read-only; add/edit/delete controls appear only after an admin Supabase account is verified through `public.museum_admins`.
+- Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres RPC.
+- Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
+- Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, opening, scroll reveal, filter refresh, and detail dialog animation.
 - Academia/Classical visual system based on dark wood, parchment, brass, crimson wax seals, arch-top covers, and sepia-to-color image treatment.
@@ -28,7 +28,7 @@ npm run preview
 
 ## Supabase Persistence
 
-The app uses `@supabase/supabase-js` from the browser with a publishable key. Public reads are allowed by RLS; writes require a signed-in Supabase user who is also listed in `public.museum_admins`. A signed-in user missing from `museum_admins` stays in read-only visitor mode.
+The app uses `@supabase/supabase-js` from the browser with a publishable key. Public reads are allowed by RLS; writes are routed through SECURITY DEFINER RPC functions and require a short-lived admin session token. Admin usernames and encrypted password hashes live in `public.museum_admin_accounts`; the frontend never reads password hashes.
 
 Environment variables:
 
@@ -42,24 +42,28 @@ The publishable key is safe to expose in a static frontend, but database access 
 One-time Supabase setup:
 
 1. Run `supabase/migrations/20260706000000_museum_artifact_persistence.sql` in the Supabase SQL Editor or through the Supabase CLI.
-2. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql`.
-3. Create or invite the admin user in Supabase Auth from the Dashboard.
-4. Insert that user ID into `public.museum_admins`.
-5. Confirm the `artifact-images` Storage bucket exists and is public-readable.
+2. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` for compatibility with earlier deployments.
+3. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
+4. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
-Example admin role insert:
+Example admin account insert:
 
 ```sql
-insert into public.museum_admins (user_id)
-values ('<admin-user-uuid>')
-on conflict (user_id) do nothing;
+insert into public.museum_admin_accounts (username, password_hash, display_name, is_active)
+values ('admin', crypt('<admin-password>', gen_salt('bf', 12)), '默认管理员', true)
+on conflict (username) do update
+set
+  password_hash = excluded.password_hash,
+  display_name = excluded.display_name,
+  is_active = true,
+  updated_at = now();
 ```
 
-Admin accounts are created in the Supabase Dashboard, not in this repository. Do not store an admin password, `sb_secret_...`, or legacy `service_role` key in the frontend, docs, or knowledge base.
+Do not store a filled admin password, `sb_secret_...`, or legacy `service_role` key in the frontend, docs, or knowledge base.
 
 ## Browser-Local Management
 
-The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. When Supabase is available, uploaded images go to the `artifact-images` bucket and artifact rows go to `public.artifacts`.
+The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. In the custom admin flow, uploaded images are stored in `public.artifacts` as data URLs alongside artifact rows.
 
 If Supabase is not configured or the remote schema is unavailable, the app falls back to reading browser-local managed artifacts. This fallback is limited to the current browser profile and does not sync across devices, users, or browsers. New writes stay disabled until admin access can be verified through Supabase.
 
@@ -78,13 +82,13 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `index.html` | Semantic shell and museum sections |
 | `src/collection.ts` | Typed sample artifact data |
 | `src/supabase-client.ts` | Supabase client and publishable-key configuration |
-| `src/artifact-store.ts` | Supabase artifact CRUD, auth helpers, Storage upload, query, and browser-local fallback |
+| `src/artifact-store.ts` | Supabase artifact query, admin-login RPC helpers, artifact CRUD RPC, and browser-local fallback |
 | `src/main.ts` | Entry gate, access state, rendering, filters, counts, management behavior, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
 | `public/artifacts/` | Generated local PNG placeholder covers and detail images |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
-| `supabase/migrations/` | Postgres tables, RLS policies, and Storage bucket policies |
+| `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, and Storage compatibility policies |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
 | `.github/workflows/deploy-pages.yml` | GitHub Pages deployment workflow |
 | `docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md` | Design spec |

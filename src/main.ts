@@ -1,6 +1,7 @@
 import "./styles.css";
 import { artifacts as sampleArtifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
 import {
+  clearStoredAdminSession,
   createRemoteArtifact,
   deleteRemoteArtifact,
   getRemoteUser,
@@ -47,7 +48,7 @@ let searchQuery = "";
 let dialogClosing = false;
 let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
 let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
-let remoteUser: Awaited<ReturnType<typeof getRemoteUser>> = null;
+let adminSession: Awaited<ReturnType<typeof getRemoteUser>> = null;
 let accessRole: AccessRole = loadStoredAccessRole();
 let isCheckingAdminRole = false;
 let adminRoleError = "";
@@ -297,14 +298,14 @@ function showGateStatus(message: string, tone: "neutral" | "success" | "danger" 
 }
 
 function canManageArtifacts() {
-  return accessRole === "admin" && Boolean(remoteUser) && persistenceMode === "supabase";
+  return accessRole === "admin" && Boolean(adminSession) && persistenceMode === "supabase";
 }
 
 function authStatusMessage() {
   if (accessRole === "locked") return { message: "等待入馆", tone: "neutral" as const };
   if (isCheckingAdminRole) return { message: "正在核验管理员", tone: "neutral" as const };
   if (adminRoleError) return { message: adminRoleError, tone: "danger" as const };
-  if (accessRole === "admin") return { message: `管理员：${remoteUser?.email ?? "admin"}`, tone: "success" as const };
+  if (accessRole === "admin") return { message: `管理员：${adminSession?.displayName ?? "admin"}`, tone: "success" as const };
   return { message: "游客只读", tone: "neutral" as const };
 }
 
@@ -325,7 +326,7 @@ function managerAccessStatus() {
     return { message: "管理员可编辑", tone: "success" as const };
   }
 
-  if (remoteUser) {
+  if (adminSession) {
     return { message: "非管理员只读", tone: "danger" as const };
   }
 
@@ -411,11 +412,11 @@ function refreshMuseumView() {
   scheduleMuseumScrollRefresh();
 }
 
-async function syncRemoteAccess(user: Awaited<ReturnType<typeof getRemoteUser>>) {
-  remoteUser = user;
+async function syncRemoteAccess(session: Awaited<ReturnType<typeof getRemoteUser>>) {
+  adminSession = session;
   adminRoleError = "";
 
-  if (!remoteUser) {
+  if (!adminSession) {
     accessRole = loadStoredAccessRole();
     isCheckingAdminRole = false;
     renderAuthState();
@@ -428,16 +429,21 @@ async function syncRemoteAccess(user: Awaited<ReturnType<typeof getRemoteUser>>)
   renderAuthState();
 
   try {
-    accessRole = (await isRemoteAdmin(remoteUser)) ? "admin" : "guest";
+    const hasAdminSession = await isRemoteAdmin(adminSession);
+    accessRole = hasAdminSession ? "admin" : "guest";
     clearStoredAccess();
-    if (accessRole === "admin") {
+    if (hasAdminSession) {
       showGateStatus("管理员已入馆", "success");
     } else {
-      showGateStatus("非管理员账号，已以游客身份入馆", "danger");
+      await signOutRemoteUser(adminSession);
+      adminSession = null;
+      showGateStatus("管理员会话已失效，已以游客身份入馆", "danger");
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
     adminRoleError = `管理员核验失败：${detail}`;
+    adminSession = null;
+    clearStoredAdminSession();
     accessRole = "guest";
     showGateStatus(adminRoleError, "danger");
   } finally {
@@ -764,18 +770,18 @@ async function handleGalleryUpload(event: Event) {
 
 async function handleGateAdminSubmit(event: SubmitEvent) {
   event.preventDefault();
-  const email = gateAuthEmail?.value.trim() ?? "";
+  const username = gateAuthEmail?.value.trim() ?? "";
   const password = gateAuthPassword?.value ?? "";
 
-  if (!email || !password) {
-    showGateStatus("请输入管理员邮箱和密码", "danger");
+  if (!username || !password) {
+    showGateStatus("请输入管理员账号和密码", "danger");
     return;
   }
 
   try {
     showGateStatus("正在登录");
     clearStoredAccess();
-    await syncRemoteAccess(await signInRemoteUser(email, password));
+    await syncRemoteAccess(await signInRemoteUser(username, password));
     if (gateAuthPassword) gateAuthPassword.value = "";
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
@@ -788,10 +794,10 @@ async function handleGateAdminSubmit(event: SubmitEvent) {
 
 async function handleSwitchIdentity() {
   try {
-    if (remoteUser) {
-      await signOutRemoteUser();
+    if (adminSession) {
+      await signOutRemoteUser(adminSession);
     }
-    remoteUser = null;
+    adminSession = null;
     accessRole = "locked";
     adminRoleError = "";
     isCheckingAdminRole = false;
@@ -808,9 +814,9 @@ async function handleSwitchIdentity() {
 async function handleGateGuestAccess() {
   adminRoleError = "";
 
-  if (remoteUser) {
-    await signOutRemoteUser();
-    remoteUser = null;
+  if (adminSession) {
+    await signOutRemoteUser(adminSession);
+    adminSession = null;
   }
 
   accessRole = "guest";
@@ -841,8 +847,8 @@ function bindAuthEvents() {
   authSignOut?.addEventListener("click", () => {
     void handleSwitchIdentity();
   });
-  onRemoteAuthChange((user) => {
-    void syncRemoteAccess(user);
+  onRemoteAuthChange((session) => {
+    void syncRemoteAccess(session);
   });
 }
 
@@ -857,7 +863,7 @@ function requireManageAccess(action: string) {
     return false;
   }
 
-  if (!remoteUser) {
+  if (!adminSession) {
     showManagerStatus(`请切换为管理员身份，再${action}`, "danger");
     return false;
   }
@@ -930,12 +936,12 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
 
   try {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
-    if (persistenceMode === "supabase" && remoteUser) {
+    if (persistenceMode === "supabase" && adminSession) {
       if (editingArtifactId) {
-        const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, remoteUser);
+        const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, adminSession);
         managedArtifacts = managedArtifacts.map((artifact) => (artifact.id === editingArtifactId ? updated : artifact));
       } else {
-        const created = await createRemoteArtifact(input, allArtifacts(), remoteUser);
+        const created = await createRemoteArtifact(input, allArtifacts(), adminSession);
         managedArtifacts = [...managedArtifacts, created];
       }
     } else {
@@ -982,6 +988,7 @@ export function handleArtifactEdit(id: string) {
 
 export async function handleArtifactDelete(id: string) {
   if (!requireManageAccess("删除藏品")) return;
+  if (!adminSession) return;
 
   const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
@@ -990,7 +997,7 @@ export async function handleArtifactDelete(id: string) {
 
   try {
     if (artifact.source === "remote" && persistenceMode === "supabase") {
-      await deleteRemoteArtifact(id, artifact);
+      await deleteRemoteArtifact(id, adminSession);
       managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
     } else {
       showManagerStatus("云端不可用，暂时只能查看藏品", "danger");

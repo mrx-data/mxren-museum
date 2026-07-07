@@ -9,7 +9,7 @@
 - Tech stack: Vite 8.1.3, TypeScript, HTML, CSS, GSAP 3.15.0, Node.js validation script
 - Package manager: npm with `package-lock.json`
 - Asset mode: generated local PNG placeholders under `public/artifacts`
-- Remote management mode: Supabase Auth + Postgres + Storage for user-managed artifacts
+- Remote management mode: custom Supabase admin account table + Postgres RPC for user-managed artifacts
 - Local fallback mode: browser-local managed artifacts can be read from the current browser profile if Supabase is unavailable; new writes stay disabled unless Supabase admin access is verified
 - GitHub repository: `https://github.com/mrx-data/mxren-museum`
 - Production site: `https://mrx-data.github.io/mxren-museum/`
@@ -17,7 +17,7 @@
 - Echo Link KB project entry: `/Users/echo/Documents/obsidian-data/echo-link-kb/wiki/projects/mxren-museum/项目首页.md`
 - Codebase index: `/Users/echo/Documents/obsidian-data/echo-link-kb/sources/code/codebase-index.md`
 
-The current version is still served as a static frontend, but the museum is hidden behind a full-site entry gate before any content is visible. Visitors enter with the `游客进入` button and stay read-only in the current browser; admins sign in with Supabase Auth and only receive add/edit/delete access after their user ID is verified in `public.museum_admins`. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local read fallback. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
+The current version is still served as a static frontend, but the museum is hidden behind a full-site entry gate before any content is visible. Visitors enter with the `游客进入` button and stay read-only in the current browser; admins sign in with the custom `public.museum_admin_accounts` username/password table and only receive add/edit/delete access after a database RPC returns a valid short-lived admin session token. It uses local sample artifact data plus Supabase-managed artifacts, with browser-local read fallback. It does not include a custom Node backend or server-side secret handling. Production deployment is GitHub Pages.
 
 ## Commands
 
@@ -53,7 +53,7 @@ Rules:
 - `index.html` contains the entry gate, semantic shell, font links, major museum sections, management panel, and dialog container.
 - `src/collection.ts` owns typed sample artifact data, cover image paths, and three detail gallery image paths per artifact. Replace or expand real collection entries here first.
 - `src/supabase-client.ts` owns Supabase client configuration. It reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, with the current project URL/publishable key as browser-safe defaults.
-- `src/artifact-store.ts` owns Supabase artifact CRUD, Auth sign-in/out helpers, admin role lookup through `public.museum_admins`, Storage uploads to `artifact-images`, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
+- `src/artifact-store.ts` owns Supabase artifact queries, custom admin login/session helpers, artifact CRUD RPC calls, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
 - `src/main.ts` renders the entry gate, hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, locked/guest/admin access state, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, opening timeline, scroll reveal, filter refresh, wax-seal loop, desktop-light parallax, and dialog open/close animation.
 - `src/styles.css` owns the Academia/Classical design system: dark mahogany, aged oak, parchment text, polished brass interactions, crimson wax seals, arch-top covers, sepia-to-color transitions, paper texture, vignette, ornate dividers, and responsive layout.
@@ -61,7 +61,8 @@ Rules:
 - `.github/workflows/deploy-pages.yml` runs `npm ci`, `npm run build`, uploads `dist`, and deploys to GitHub Pages.
 - `supabase/migrations/20260706000000_museum_artifact_persistence.sql` creates `public.artifacts`, `public.museum_admins`, RLS policies, the public-readable `artifact-images` bucket, and Storage object policies. Apply it in Supabase before expecting cloud writes.
 - `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` grants authenticated users the RLS-limited ability to check whether their own user ID exists in `public.museum_admins`.
-- To allow writes, create or invite a Supabase Auth user from the Dashboard, copy that user's UUID, and insert it into `public.museum_admins`. Do not create admin passwords or service-role flows in frontend code. Public reads are allowed; writes are admin-only via RLS.
+- `supabase/migrations/20260707010000_museum_admin_password_accounts.sql` creates `public.museum_admin_accounts`, hashed admin sessions, password-login RPC, and artifact CRUD RPC for the current custom admin flow.
+- To allow writes, create an admin row in `public.museum_admin_accounts` from Supabase SQL Editor with `crypt('<admin-password>', gen_salt('bf', 12))`. Do not commit filled password SQL, `sb_secret_...`, or legacy `service_role` keys. Public reads are allowed; writes go through admin-session RPC.
 - `public/artifacts/` contains local artifact images for the 10 sample artifacts, including generated PNG placeholders and the user-provided `blackMyth.png` cover.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.
 - The current images are generated placeholders, not user-provided final素材. When real images are added, preserve alt text, arch-top treatment, and the sepia-to-color interaction.
@@ -107,8 +108,8 @@ Minimum browser checks:
 - Guest path: choose `游客进入`, confirm the app stays read-only after refresh and no create/edit/delete controls are exposed.
 - Switch identity path: choose `切换身份` or admin sign-out, confirm the gate returns and guest local state is cleared.
 - Supabase fallback: when the remote schema is unavailable, the app keeps rendering managed data in read-only mode and reports that cloud access is unavailable.
-- Supabase non-admin path: log in with a Supabase Auth user missing from `museum_admins`, confirm status is read-only and writes stay blocked.
-- Supabase admin path: after applying both migrations and logging in as a `museum_admins` user, create/edit/delete a managed artifact and confirm the row is in `public.artifacts` and images are in `artifact-images`.
+- Supabase invalid-admin path: log in with an unknown username or wrong password, confirm the app stays locked/read-only and no create/edit/delete controls are exposed.
+- Supabase admin path: after applying all migrations and inserting a `museum_admin_accounts` row, log in as that account, create/edit/delete a managed artifact, and confirm the row is in `public.artifacts`.
 - Category filters update visible cards and `aria-pressed`.
 - Artifact detail dialog opens and closes with Escape.
 - Artifact detail dialog includes cover, ledger metadata, introduction, a three-image strip with loaded local PNGs, and visible motion-ledger items.

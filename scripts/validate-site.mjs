@@ -37,6 +37,7 @@ function assert(condition, message) {
   "docs/supabase-persistence.md",
   "supabase/migrations/20260706000000_museum_artifact_persistence.sql",
   "supabase/migrations/20260706010000_museum_admin_role_lookup.sql",
+  "supabase/migrations/20260707010000_museum_admin_password_accounts.sql",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -57,6 +58,7 @@ const viteConfig = read("vite.config.ts");
 const envExample = read(".env.example");
 const supabaseMigration = read("supabase/migrations/20260706000000_museum_artifact_persistence.sql");
 const supabaseRoleMigration = read("supabase/migrations/20260706010000_museum_admin_role_lookup.sql");
+const supabasePasswordMigration = read("supabase/migrations/20260707010000_museum_admin_password_accounts.sql");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
@@ -147,6 +149,8 @@ assert(!css.includes("vw,"), "Viewport-width font scaling is not allowed");
 
 const combined = `${html}\n${collection}\n${main}\n${css}\n${readme}`;
 assert(!/\b(TODO|TBD|FIXME)\b/i.test(combined), "Placeholder text remains in project files");
+const forbiddenDefaultPassword = ["123", "mengrenxu"].join("");
+assert(!`${combined}\n${supabasePasswordMigration}`.includes(forbiddenDefaultPassword), "Default admin password must not be committed");
 
 const coverCount = (collection.match(/\bcoverImage: "/g) || []).length;
 const galleryCount = (collection.match(/\bgalleryImages: \[/g) || []).length;
@@ -258,8 +262,24 @@ assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository b
 });
 
 [
-  "public.museum_admins",
-  "artifact-images",
+  "create table if not exists public.museum_admin_accounts",
+  "password_hash text not null",
+  "crypt(coalesce(input_password",
+  "museum_admin_sessions",
+  "verify_museum_admin_login",
+  "verify_museum_admin_session",
+  "create_museum_artifact",
+  "update_museum_artifact",
+  "delete_museum_artifact",
+  "alter column owner_id drop not null",
+  "grant execute on function public.verify_museum_admin_login"
+].forEach((pattern) => {
+  assert(supabasePasswordMigration.includes(pattern), `Missing Supabase password admin migration pattern: ${pattern}`);
+});
+
+[
+  "public.museum_admin_accounts",
+  "verify_museum_admin_login",
   "npm run build",
   "Do not use `sb_secret_...`"
 ].forEach((pattern) => {
@@ -269,6 +289,7 @@ assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository b
 assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 
 [
+  "mxren-museum.admin-session.v1",
   "mxren-museum.local-artifacts.v1",
   "loadManagedArtifacts",
   "loadRemoteArtifacts",
@@ -277,6 +298,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "deleteRemoteArtifact",
   "isRemoteAdmin",
   "signInRemoteUser",
+  "verify_museum_admin_login",
+  "storeAdminSession",
   "createLocalArtifact",
   "updateLocalArtifact",
   "deleteLocalArtifact",

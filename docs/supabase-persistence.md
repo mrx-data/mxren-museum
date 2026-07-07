@@ -1,29 +1,34 @@
 # Supabase Persistence Runbook
 
-mxren-museum remains a static GitHub Pages site. Supabase provides the runtime persistence layer for managed artifacts:
+mxren-museum remains a static GitHub Pages site. Supabase provides the runtime persistence layer for managed artifacts and custom admin login:
 
-- Auth: the full site is hidden behind an entry gate; visitors enter with one click, while admins sign in with Supabase email/password for write operations.
+- Auth: the full site is hidden behind an entry gate; visitors enter with one click, while admins sign in with a username/password stored in `public.museum_admin_accounts`.
 - Postgres: `public.artifacts` stores artifact metadata.
-- Storage: `artifact-images` stores uploaded cover and gallery images.
-- RLS: public reads are allowed; writes require a signed-in user listed in `public.museum_admins`.
-- Access roles: `locked` hides the museum, `guest` is read-only, and `admin` is granted only after the signed-in Supabase Auth user is found in `public.museum_admins`.
+- Admin credentials: passwords are stored as `pgcrypto.crypt()` hashes; the frontend never reads the hash.
+- Admin sessions: `public.museum_admin_sessions` stores hashed short-lived session tokens returned by `verify_museum_admin_login`.
+- RLS/RPC: public reads are allowed; writes go through `create_museum_artifact`, `update_museum_artifact`, and `delete_museum_artifact` RPC functions after session verification.
+- Access roles: `locked` hides the museum, `guest` is read-only, and `admin` is granted only after the admin session token is verified by `verify_museum_admin_session`.
 
 ## One-Time Setup
 
 1. Open the Supabase SQL Editor for `https://wjhktoqihszgdkxbanxu.supabase.co`.
 2. Run `supabase/migrations/20260706000000_museum_artifact_persistence.sql`.
 3. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql`.
-4. Create or invite the admin user in Supabase Auth.
-5. Copy the admin user's UUID.
-6. Run:
+4. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
+5. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
-insert into public.museum_admins (user_id)
-values ('<admin-user-uuid>')
-on conflict (user_id) do nothing;
+insert into public.museum_admin_accounts (username, password_hash, display_name, is_active)
+values ('admin', crypt('<admin-password>', gen_salt('bf', 12)), '默认管理员', true)
+on conflict (username) do update
+set
+  password_hash = excluded.password_hash,
+  display_name = excluded.display_name,
+  is_active = true,
+  updated_at = now();
 ```
 
-7. In the app, open the site, choose `管理员登录` on the entry gate, sign in with that Supabase Auth account, then open `#manage` and create a test artifact.
+6. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage` and create a test artifact.
 
 ## Environment
 
@@ -45,15 +50,15 @@ Do not use `sb_secret_...` or legacy `service_role` keys in this Vite app.
 - Browser check: choosing `游客进入` stores guest mode in the current browser and allows read-only access to the home page, collection, and detail dialog after refresh.
 - Guest check: `#manage` shows read-only status and hides create/edit/delete/upload controls.
 - Switch check: choosing `切换身份` clears guest mode and returns to the entry gate.
-- Auth check: non-signed-in users cannot create, update, delete, or upload managed artifacts.
-- Role check: signed-in users missing from `public.museum_admins` remain read-only.
-- Admin check: signed-in users listed in `public.museum_admins` can create, edit, delete, and upload images.
+- Auth check: invalid username/password returns to the entry gate and exposes no management controls.
+- Session check: deleting or expiring a row in `public.museum_admin_sessions` makes the stored browser admin session read-only again.
+- Admin check: valid `public.museum_admin_accounts` credentials can create, edit, delete, and upload images through database RPC.
 
 ## Failure Modes
 
 - Missing table or policy: the app falls back to `browser-local storage`.
 - Missing guest access key: visitors return to the entry gate until they choose `游客进入` again.
-- Missing admin role lookup grant: sign-in succeeds, but the app cannot verify admin access and stays read-only.
-- Missing admin row: sign-in succeeds, but the app remains read-only and writes fail through RLS.
-- Storage policy mismatch: artifact row may save, but image upload fails before insert/update completes.
+- Missing password-account migration: admin login fails because the `verify_museum_admin_login` RPC does not exist.
+- Missing admin account row: admin login fails and the app remains locked/read-only.
+- Expired admin session: the app clears the stored session and returns to guest read-only mode.
 - GitHub Pages deployment does not need a server change; the browser bundle talks to Supabase directly.
