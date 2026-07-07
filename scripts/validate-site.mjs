@@ -264,6 +264,7 @@ assert(viteConfig.includes("/mxren-museum/"), "Missing GitHub Pages repository b
 [
   "create table if not exists public.museum_admin_accounts",
   "password_hash text not null",
+  "set search_path = public, extensions",
   "crypt(coalesce(input_password",
   "museum_admin_sessions",
   "verify_museum_admin_login",

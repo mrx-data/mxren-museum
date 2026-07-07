@@ -49,6 +49,8 @@ One-time Supabase setup:
 Example admin account insert:
 
 ```sql
+set search_path = public, extensions;
+
 insert into public.museum_admin_accounts (username, password_hash, display_name, is_active)
 values ('admin', crypt('<admin-password>', gen_salt('bf', 12)), '默认管理员', true)
 on conflict (username) do update

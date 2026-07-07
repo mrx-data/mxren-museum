@@ -36,7 +36,7 @@ returns text
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select username
   from public.museum_admin_sessions
@@ -50,7 +50,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select public.museum_admin_session_username(input_session_token) is not null;
 $$;
@@ -64,7 +64,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   admin_account public.museum_admin_accounts%rowtype;
@@ -104,7 +104,7 @@ create or replace function public.clear_museum_admin_session(input_session_token
 returns void
 language sql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   delete from public.museum_admin_sessions
   where token_hash = encode(digest(coalesce(input_session_token, ''), 'sha256'), 'hex');
@@ -115,7 +115,7 @@ returns text
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   session_username text;
@@ -132,7 +132,7 @@ create or replace function public.create_museum_artifact(input_session_token tex
 returns public.artifacts
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   inserted_artifact public.artifacts;
@@ -189,7 +189,7 @@ create or replace function public.update_museum_artifact(input_session_token tex
 returns public.artifacts
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   updated_artifact public.artifacts;
@@ -229,7 +229,7 @@ create or replace function public.delete_museum_artifact(input_session_token tex
 returns public.artifacts
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   deleted_artifact public.artifacts;

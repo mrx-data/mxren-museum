@@ -18,6 +18,8 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 5. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
+set search_path = public, extensions;
+
 insert into public.museum_admin_accounts (username, password_hash, display_name, is_active)
 values ('admin', crypt('<admin-password>', gen_salt('bf', 12)), '默认管理员', true)
 on conflict (username) do update
