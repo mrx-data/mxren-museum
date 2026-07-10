@@ -20,9 +20,11 @@ import {
   type PersistenceMode
 } from "./artifact-store";
 import {
+  animateCollectionRefresh,
   animateArtifactDialog,
   animateArtifactDialogClose,
   initMuseumMotion,
+  playMuseumEntry,
   refreshMuseumScrollAnimations
 } from "./museum-motion";
 
@@ -61,6 +63,8 @@ let pendingGalleryFiles: File[] = [];
 let activeRouteState: RouteState | null = null;
 let activeHash = "";
 let motionRefreshFrame = 0;
+let searchDebounceTimer = 0;
+let renderedAccessRole: AccessRole | null = null;
 const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
 const accessGate = document.querySelector<HTMLElement>("#access-gate");
@@ -148,12 +152,13 @@ function setCoverStyle(element: HTMLElement, artifact: Artifact) {
   element.style.setProperty("--cover-accent", artifact.palette.accent);
 }
 
-function createImageElement(src: string, alt: string) {
+function createImageElement(src: string, alt: string, loading: "eager" | "lazy" = "lazy", highPriority = false) {
   const image = document.createElement("img");
   image.src = resolveAssetSrc(src);
   image.alt = alt;
-  image.loading = "lazy";
+  image.loading = loading;
   image.decoding = "async";
+  if (highPriority) image.setAttribute("fetchpriority", "high");
   return image;
 }
 
@@ -274,8 +279,7 @@ function allArtifacts() {
   return [...sampleArtifacts, ...managedArtifacts];
 }
 
-function artifactNumber(artifact: Artifact) {
-  const index = allArtifacts().findIndex((item) => item.id === artifact.id);
+function artifactNumber(index: number) {
   return `No.${String(Math.max(index, 0) + 1).padStart(3, "0")}`;
 }
 
@@ -349,6 +353,8 @@ function setManagementControlsDisabled() {
 
 function renderAuthState(updateManagerStatus = true) {
   const isLocked = accessRole === "locked";
+  const isUnlockTransition = renderedAccessRole === "locked" && !isLocked;
+  renderedAccessRole = accessRole;
 
   document.body.dataset.accessRole = accessRole;
 
@@ -399,6 +405,9 @@ function renderAuthState(updateManagerStatus = true) {
 
   syncRouteFromHash(false, false);
   scheduleMuseumScrollRefresh();
+  if (isUnlockTransition) {
+    requestAnimationFrame(() => playMuseumEntry());
+  }
 }
 
 function refreshMuseumView() {
@@ -473,7 +482,7 @@ function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
   cover.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
 }
 
-function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
+function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequenceIndex: number) {
   const article = document.createElement("article");
   article.className = `artifact-card poster-work corner-flourish ${variant === "featured" ? "is-featured" : ""}`;
   article.setAttribute("data-motion-item", variant);
@@ -496,7 +505,7 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard") {
   body.className = "artifact-body";
   body.innerHTML = `
     <div class="poster-card-topline">
-      <span>${escapeHtml(artifactNumber(artifact))}</span>
+      <span>${escapeHtml(artifactNumber(sequenceIndex))}</span>
       <span>细赏</span>
     </div>
     <p class="artifact-volume">Volume ${escapeHtml(artifact.volume)}</p>
@@ -539,7 +548,7 @@ function renderHeroStage() {
       button.addEventListener("click", () => openArtifactDialog(artifact));
 
       if (artifact.coverImage) {
-        button.append(createImageElement(artifact.coverImage, artifact.coverAlt));
+        button.append(createImageElement(artifact.coverImage, artifact.coverAlt, "eager", index === 0));
       }
       button.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
       return button;
@@ -576,9 +585,8 @@ function renderCategoryIndex() {
         activeFilter = category.id;
         renderCategoryIndex();
         renderFilters();
-        renderCollection();
+        renderCollection(true);
         collectionGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
-        scheduleMuseumScrollRefresh();
       });
       return button;
     })
@@ -601,24 +609,32 @@ export function renderFilters() {
       activeFilter = category.id;
       renderCategoryIndex();
       renderFilters();
-      renderCollection();
-      scheduleMuseumScrollRefresh();
+      renderCollection(true);
     });
     filterBar.append(button);
   });
 }
 
-export function renderCollection() {
+export function renderCollection(animate = false) {
   if (!collectionGrid) return;
 
-  const visibleArtifacts = queryArtifacts(allArtifacts(), searchQuery, activeFilter);
-  collectionGrid.replaceChildren(...visibleArtifacts.map((artifact) => artifactCard(artifact, "standard")));
+  const artifacts = allArtifacts();
+  const artifactOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
+  const visibleArtifacts = queryArtifacts(artifacts, searchQuery, activeFilter);
+  collectionGrid.replaceChildren(
+    ...visibleArtifacts.map((artifact) => artifactCard(artifact, "standard", artifactOrder.get(artifact.id) ?? 0))
+  );
+  if (animate) animateCollectionRefresh(collectionGrid);
 }
 
 function renderFeatured() {
   if (!featuredGallery) return;
-  const featured = allArtifacts().filter((artifact) => artifact.featured);
-  featuredGallery.replaceChildren(...featured.map((artifact) => artifactCard(artifact, "featured")));
+  const artifacts = allArtifacts();
+  const artifactOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
+  const featured = artifacts.filter((artifact) => artifact.featured);
+  featuredGallery.replaceChildren(
+    ...featured.map((artifact) => artifactCard(artifact, "featured", artifactOrder.get(artifact.id) ?? 0))
+  );
 }
 
 export function openArtifactDialog(artifact: Artifact) {
@@ -1099,9 +1115,11 @@ function bindDialogEvents() {
 
 function bindManagementEvents() {
   artifactSearch?.addEventListener("input", () => {
-    searchQuery = artifactSearch.value;
-    renderCollection();
-    scheduleMuseumScrollRefresh();
+    window.clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = window.setTimeout(() => {
+      searchQuery = artifactSearch.value;
+      renderCollection(true);
+    }, 120);
   });
   artifactForm?.addEventListener("submit", (event) => {
     void handleArtifactSubmit(event);

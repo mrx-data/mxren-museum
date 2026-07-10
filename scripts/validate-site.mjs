@@ -181,6 +181,9 @@ assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animat
 [
   "data-motion-root",
   "data-motion-ambient",
+  "data-motion-light",
+  "data-motion-light-secondary",
+  "data-motion-pointer-light",
   "data-motion-hero",
   "data-motion-title",
   "data-motion-section",
@@ -198,15 +201,23 @@ assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animat
   "ScrollTrigger",
   "prefers-reduced-motion",
   "initMuseumMotion",
+  "playMuseumEntry",
   "refreshMuseumScrollAnimations",
+  "animateCollectionRefresh",
   "animateArtifactDialog",
-  "animateArtifactDialogClose"
+  "animateArtifactDialogClose",
+  "gsap.quickTo",
+  "visibilitychange",
+  "clearProps"
 ].forEach((pattern) => {
   assert(motion.includes(pattern), `Missing motion module pattern: ${pattern}`);
 });
 
 assert(css.includes(".museum-atmosphere"), "Missing ambient motion layer styling");
+assert(css.includes(".museum-pointer-light"), "Missing pointer light styling");
 assert(css.includes(".motion-reveal"), "Missing motion reveal styling");
+assert(main.includes("searchDebounceTimer"), "Missing collection search debounce");
+assert(main.includes("fetchpriority"), "Missing high-priority hero image loading");
 
 ["node_modules", "dist", ".DS_Store"].forEach((pattern) => {
   assert(gitignore.includes(pattern), `Missing .gitignore pattern: ${pattern}`);
