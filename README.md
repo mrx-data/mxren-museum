@@ -19,6 +19,7 @@ npm run preview
 - Local sample collection data in `src/collection.ts`.
 - Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
 - Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres RPC.
+- Built-in artifacts can be edited through cloud override rows keyed by `source_artifact_id`; the original TypeScript entries remain as recoverable defaults and are not duplicated in the gallery.
 - Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
 - Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
@@ -44,7 +45,8 @@ One-time Supabase setup:
 1. Run `supabase/migrations/20260706000000_museum_artifact_persistence.sql` in the Supabase SQL Editor or through the Supabase CLI.
 2. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` for compatibility with earlier deployments.
 3. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
-4. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+4. Run `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql`.
+5. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 
@@ -90,7 +92,7 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
 | `public/artifacts/` | Generated local PNG placeholder covers and detail images |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
-| `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, and Storage compatibility policies |
+| `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, built-in artifact overrides, and Storage compatibility policies |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
 | `.github/workflows/deploy-pages.yml` | GitHub Pages deployment workflow |
 | `docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md` | Design spec |

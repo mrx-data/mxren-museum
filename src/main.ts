@@ -275,8 +275,17 @@ function navigateToHash(hash: string) {
   showRoutePage(routeState, true, true, normalizedHash);
 }
 
+export function mergeArtifacts(samples: Artifact[], managed: ManagedArtifact[]) {
+  const managedById = new Map(managed.map((artifact) => [artifact.id, artifact]));
+  const sampleIds = new Set(samples.map((artifact) => artifact.id));
+  return [
+    ...samples.map((artifact) => managedById.get(artifact.id) ?? artifact),
+    ...managed.filter((artifact) => !sampleIds.has(artifact.id))
+  ];
+}
+
 function allArtifacts() {
-  return [...sampleArtifacts, ...managedArtifacts];
+  return mergeArtifacts(sampleArtifacts, managedArtifacts);
 }
 
 function artifactNumber(index: number) {
@@ -954,8 +963,21 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
     if (persistenceMode === "supabase" && adminSession) {
       if (editingArtifactId) {
-        const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, adminSession);
-        managedArtifacts = managedArtifacts.map((artifact) => (artifact.id === editingArtifactId ? updated : artifact));
+        const managedArtifact = managedArtifacts.find((artifact) => artifact.id === editingArtifactId);
+        if (managedArtifact) {
+          const updated = await updateRemoteArtifact(editingArtifactId, input, managedArtifacts, adminSession);
+          managedArtifacts = managedArtifacts.map((artifact) => (artifact.id === editingArtifactId ? updated : artifact));
+        } else {
+          const sampleArtifact = sampleArtifacts.find((artifact) => artifact.id === editingArtifactId);
+          if (!sampleArtifact) throw new Error("找不到要修改的藏品");
+          const created = await createRemoteArtifact(input, allArtifacts(), adminSession, {
+            sourceArtifactId: sampleArtifact.id,
+            volume: sampleArtifact.volume,
+            palette: sampleArtifact.palette,
+            symbol: sampleArtifact.symbol
+          });
+          managedArtifacts = [...managedArtifacts, created];
+        }
       } else {
         const created = await createRemoteArtifact(input, allArtifacts(), adminSession);
         managedArtifacts = [...managedArtifacts, created];
@@ -977,7 +999,7 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
 export function handleArtifactEdit(id: string) {
   if (!requireManageAccess("修改藏品")) return;
 
-  const artifact = managedArtifacts.find((item) => item.id === id);
+  const artifact = allArtifacts().find((item) => item.id === id);
   if (!artifact) return;
 
   editingArtifactId = artifact.id;
@@ -1009,11 +1031,15 @@ export async function handleArtifactDelete(id: string) {
   const artifact = managedArtifacts.find((item) => item.id === id);
   if (!artifact) return;
 
-  if (!globalThis.confirm(`删除藏品「${artifact.title}」？`)) return;
+  const restoresSample = Boolean(artifact.sourceArtifactId);
+  const confirmation = restoresSample
+    ? `恢复藏品「${artifact.title}」为内置版本？`
+    : `删除藏品「${artifact.title}」？`;
+  if (!globalThis.confirm(confirmation)) return;
 
   try {
     if (artifact.source === "remote" && persistenceMode === "supabase") {
-      await deleteRemoteArtifact(id, adminSession);
+      await deleteRemoteArtifact(artifact.remoteId ?? id, adminSession);
       managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
     } else {
       showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
@@ -1021,7 +1047,7 @@ export async function handleArtifactDelete(id: string) {
     }
 
     if (editingArtifactId === id) resetArtifactForm();
-    showManagerStatus("藏品已删除", "success");
+    showManagerStatus(restoresSample ? "已恢复内置版本" : "藏品已删除", "success");
     refreshMuseumView();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
@@ -1032,21 +1058,22 @@ export async function handleArtifactDelete(id: string) {
 function renderManagerList() {
   if (!artifactManagerList) return;
   const canManage = canManageArtifacts();
+  const artifacts = allArtifacts();
 
   if (artifactManagerListTitle) {
-    artifactManagerListTitle.textContent = persistenceMode === "supabase" ? "云端藏品" : "本地藏品";
+    artifactManagerListTitle.textContent = "全部馆藏";
   }
 
-  if (managedArtifacts.length === 0) {
+  if (artifacts.length === 0) {
     const empty = document.createElement("p");
     empty.className = "manager-empty";
-    empty.textContent = persistenceMode === "supabase" ? "还没有云端新增藏品。" : "还没有本地新增藏品。";
+    empty.textContent = "还没有馆藏条目。";
     artifactManagerList.replaceChildren(empty);
     return;
   }
 
   artifactManagerList.replaceChildren(
-    ...managedArtifacts.map((artifact) => {
+    ...artifacts.map((artifact) => {
       const row = document.createElement("article");
       row.className = "manager-row";
 
@@ -1055,7 +1082,16 @@ function renderManagerList() {
       title.textContent = artifact.title;
       const meta = document.createElement("p");
       meta.textContent = `${artifact.categoryLabel} · ${artifact.year} · ${artifact.rarity}`;
-      copy.append(title, meta);
+      const source = document.createElement("span");
+      source.className = "manager-source";
+      source.textContent = artifact.sourceArtifactId
+        ? "云端覆盖"
+        : artifact.source === "remote"
+          ? "云端新增"
+          : artifact.source === "local"
+            ? "本地回退"
+            : "内置藏品";
+      copy.append(title, meta, source);
 
       const actions = document.createElement("div");
       actions.className = "manager-actions";
@@ -1068,16 +1104,21 @@ function renderManagerList() {
         editButton.setAttribute("aria-label", `修改 ${artifact.title}`);
         editButton.addEventListener("click", () => handleArtifactEdit(artifact.id));
 
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.className = "button button-danger";
-        deleteButton.textContent = "删除";
-        deleteButton.setAttribute("aria-label", `删除 ${artifact.title}`);
-        deleteButton.addEventListener("click", () => {
-          void handleArtifactDelete(artifact.id);
-        });
-
-        actions.append(editButton, deleteButton);
+        actions.append(editButton);
+        if (artifact.source === "remote") {
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "button button-danger";
+          deleteButton.textContent = artifact.sourceArtifactId ? "恢复内置" : "删除";
+          deleteButton.setAttribute(
+            "aria-label",
+            artifact.sourceArtifactId ? `恢复 ${artifact.title} 为内置版本` : `删除 ${artifact.title}`
+          );
+          deleteButton.addEventListener("click", () => {
+            void handleArtifactDelete(artifact.id);
+          });
+          actions.append(deleteButton);
+        }
         row.append(copy, actions);
         return row;
       }

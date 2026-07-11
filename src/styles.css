@@ -1390,6 +1390,15 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   color: var(--muted-foreground);
 }
 
+.manager-source {
+  display: inline-flex;
+  margin-top: 8px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
 .manager-readonly {
   display: inline-flex;
   align-items: center;

@@ -30,6 +30,8 @@ export type Artifact = {
   source?: "sample" | "local" | "remote";
   updatedAt?: string;
   coverStoragePath?: string;
+  remoteId?: string;
+  sourceArtifactId?: string;
 };
 
 export const categories: Array<{ id: "all" | ArtifactCategory; label: string }> = [

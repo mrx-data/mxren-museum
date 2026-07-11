@@ -38,6 +38,8 @@ export type ManagedArtifact = Artifact & {
   source: ManagedSource;
   updatedAt: string;
   ownerId?: string;
+  remoteId?: string;
+  sourceArtifactId?: string;
 };
 
 export type AdminSession = {
@@ -58,6 +60,7 @@ type StoredArtifact = ManagedArtifact;
 
 type ArtifactRow = {
   id: string;
+  source_artifact_id: string | null;
   owner_id: string | null;
   title: string;
   category: string;
@@ -215,6 +218,10 @@ function artifactFromInput(
     galleryImages?: GalleryImageInput[];
     ownerId?: string;
     volume?: string;
+    remoteId?: string;
+    sourceArtifactId?: string;
+    palette?: Artifact["palette"];
+    symbol?: string;
   } = {}
 ): ManagedArtifact {
   const title = normalizeText(input.title);
@@ -231,16 +238,18 @@ function artifactFromInput(
     medium: normalizeText(input.medium) || "Digital Artifact",
     rarity: normalizeText(input.rarity) || (source === "remote" ? "云端馆藏" : "本地馆藏"),
     featured: input.featured,
-    symbol: symbolByCategory[category],
+    symbol: options.symbol ?? symbolByCategory[category],
     coverAlt: normalizeText(input.coverAlt ?? "") || `${title} 的藏品封面`,
     coverImage: normalizeText(options.coverImage ?? input.coverImage ?? ""),
     coverStoragePath: normalizeText(options.coverStoragePath ?? input.coverStoragePath ?? "") || undefined,
     galleryImages: normalizeGalleryImages(input, options.galleryImages),
-    palette: defaultPaletteByCategory[category],
+    palette: options.palette ?? defaultPaletteByCategory[category],
     summary: normalizeText(input.summary),
     note: normalizeText(input.note),
     source,
     ownerId: options.ownerId,
+    remoteId: options.remoteId,
+    sourceArtifactId: options.sourceArtifactId,
     updatedAt: now
   };
 }
@@ -269,9 +278,10 @@ function galleryFromUnknown(value: unknown, title: string): ArtifactGalleryImage
 function artifactFromRow(row: ArtifactRow): ManagedArtifact {
   const category = isArtifactCategory(row.category) ? row.category : "personal-works";
   const title = row.title.trim() || "未命名藏品";
+  const sourceArtifactId = row.source_artifact_id?.trim() || undefined;
 
   return {
-    id: row.id,
+    id: sourceArtifactId ?? row.id,
     title,
     category,
     categoryLabel: row.category_label?.trim() || categoryLabel(category),
@@ -290,13 +300,16 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     note: row.note?.trim() || "",
     source: "remote",
     ownerId: row.owner_id ?? undefined,
+    remoteId: row.id,
+    sourceArtifactId,
     updatedAt: row.updated_at ?? new Date().toISOString()
   };
 }
 
 function rowFromArtifact(artifact: ManagedArtifact) {
   return {
-    id: artifact.id,
+    id: artifact.remoteId ?? artifact.id,
+    source_artifact_id: artifact.sourceArtifactId ?? null,
     owner_id: artifact.ownerId ?? null,
     title: artifact.title,
     category: artifact.category,
@@ -493,12 +506,33 @@ export function onRemoteAuthChange(_callback: (session: AdminSession | null) => 
 export async function createRemoteArtifact(
   input: ArtifactFormInput,
   existing: Artifact[],
-  session: AdminSession
+  session: AdminSession,
+  options: {
+    sourceArtifactId?: string;
+    volume?: string;
+    palette?: Artifact["palette"];
+    symbol?: string;
+  } = {}
 ): Promise<ManagedArtifact> {
   const supabase = getSupabaseClient();
-  const id = input.id ?? remoteId();
-  const artifact = artifactFromInput(input, existing, id, "remote", {
-    galleryImages: normalizeGalleryImages(input)
+  if (options.sourceArtifactId) {
+    const { error: schemaError } = await supabase
+      .from("artifacts")
+      .select("source_artifact_id")
+      .limit(1);
+    if (schemaError) {
+      throw new Error("请先应用内置藏品覆盖 migration，再保存这次修改");
+    }
+  }
+  const databaseId = remoteId();
+  const displayId = options.sourceArtifactId ?? input.id ?? databaseId;
+  const artifact = artifactFromInput(input, existing, displayId, "remote", {
+    galleryImages: normalizeGalleryImages(input),
+    remoteId: databaseId,
+    sourceArtifactId: options.sourceArtifactId,
+    volume: options.volume,
+    palette: options.palette,
+    symbol: options.symbol
   });
 
   const { data, error } = await supabase.rpc("create_museum_artifact", {
@@ -520,12 +554,16 @@ export async function updateRemoteArtifact(
   const current = existing.find((artifact) => artifact.id === id);
   const artifact = artifactFromInput(input, existing, id, "remote", {
     galleryImages: normalizeGalleryImages(input),
-    volume: current?.volume
+    volume: current?.volume,
+    remoteId: current?.remoteId ?? id,
+    sourceArtifactId: current?.sourceArtifactId,
+    palette: current?.palette,
+    symbol: current?.symbol
   });
 
   const { data, error } = await supabase.rpc("update_museum_artifact", {
     input_session_token: session.token,
-    artifact_id: id,
+    artifact_id: current?.remoteId ?? id,
     artifact_row: rowFromArtifact(artifact)
   });
 

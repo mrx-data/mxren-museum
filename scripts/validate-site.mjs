@@ -38,6 +38,7 @@ function assert(condition, message) {
   "supabase/migrations/20260706000000_museum_artifact_persistence.sql",
   "supabase/migrations/20260706010000_museum_admin_role_lookup.sql",
   "supabase/migrations/20260707010000_museum_admin_password_accounts.sql",
+  "supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -59,6 +60,7 @@ const envExample = read(".env.example");
 const supabaseMigration = read("supabase/migrations/20260706000000_museum_artifact_persistence.sql");
 const supabaseRoleMigration = read("supabase/migrations/20260706010000_museum_admin_role_lookup.sql");
 const supabasePasswordMigration = read("supabase/migrations/20260707010000_museum_admin_password_accounts.sql");
+const supabaseOverrideMigration = read("supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
@@ -333,6 +335,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   'id="artifact-gallery-upload"',
   'id="artifact-manager-list"',
   'id="artifact-manager-status"',
+  "修改已经入馆的藏品",
+  "全部馆藏",
   'accept="image/*"',
   "multiple"
 ].forEach((pattern) => {
@@ -352,6 +356,7 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "handleArtifactSubmit",
   "handleArtifactDelete",
   "handleArtifactEdit",
+  "mergeArtifacts",
   "handleGateGuestAccess",
   "handleGateAdminSubmit",
   "handleSwitchIdentity",
@@ -363,6 +368,27 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   ".slice(0, 3)"
 ].forEach((pattern) => {
   assert(main.includes(pattern), `Missing artifact management script pattern: ${pattern}`);
+});
+
+[
+  "sourceArtifactId",
+  "remoteId",
+  "source_artifact_id",
+  "palette: current?.palette",
+  "symbol: current?.symbol",
+  "请先应用内置藏品覆盖 migration"
+].forEach((pattern) => {
+  assert(artifactStore.includes(pattern), `Missing artifact override store pattern: ${pattern}`);
+});
+
+[
+  "add column if not exists source_artifact_id text",
+  "artifacts_source_artifact_id_unique",
+  "on conflict (source_artifact_id) where source_artifact_id is not null",
+  "create or replace function public.create_museum_artifact",
+  "create or replace function public.update_museum_artifact"
+].forEach((pattern) => {
+  assert(supabaseOverrideMigration.includes(pattern), `Missing sample artifact override migration pattern: ${pattern}`);
 });
 
 [
