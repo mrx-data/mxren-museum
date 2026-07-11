@@ -90,6 +90,7 @@ assert(pkg.dependencies?.gsap || pkg.devDependencies?.gsap, "Missing local GSAP 
 ["cover-symbol", "wax-seal", "arch-top", "sepia-reveal"].forEach((pattern) => {
   assert(!`${main}\n${css}`.includes(pattern), `Cover decoration must not be rendered: ${pattern}`);
 });
+assert(!html.includes("蜡封"), "Removed wax-seal decoration must not remain in interface copy");
 
 ["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V"].forEach((label) => {
   assert(html.includes(label), `Missing Roman volume label: ${label}`);
