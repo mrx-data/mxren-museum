@@ -536,16 +536,19 @@ p {
 
 .stage-card:nth-child(2) {
   z-index: 3;
+  filter: sepia(0.22) brightness(0.85);
   transform: translateX(calc(-50% + 46px)) translateY(18px) rotate(5deg) scale(0.88);
 }
 
 .stage-card:nth-child(3) {
   z-index: 2;
+  filter: sepia(0.38) brightness(0.74);
   transform: translateX(calc(-50% - 56px)) translateY(38px) rotate(-6deg) scale(0.78);
 }
 
 .stage-card:nth-child(4) {
   z-index: 1;
+  filter: sepia(0.5) brightness(0.68);
   transform: translateX(calc(-50% + 88px)) translateY(58px) rotate(9deg) scale(0.7);
 }
 
@@ -558,6 +561,18 @@ p {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.stage-card::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(28, 23, 20, 0.08), transparent 42%, rgba(28, 23, 20, 0.32)),
+    linear-gradient(100deg, transparent 0%, rgba(232, 223, 212, 0.16) 48%, transparent 62%);
+  mix-blend-mode: screen;
 }
 
 .stage-caption {
@@ -606,6 +621,23 @@ p {
     radial-gradient(circle at 50% 34%, rgba(232, 223, 212, 0.18), transparent 7rem),
     linear-gradient(145deg, #18120F, #543325 44%, #C9A962 100%);
   overflow: hidden;
+}
+
+.arch-top {
+  border-radius: 40% 40% 0 0 / 20% 20% 0 0;
+}
+
+.sepia-reveal {
+  filter: sepia(0.6) contrast(0.95) brightness(0.9);
+  transition:
+    filter 700ms ease-out,
+    transform 700ms ease-out;
+}
+
+.sepia-reveal:hover,
+.artifact-button:hover .sepia-reveal {
+  filter: sepia(0) contrast(1) brightness(1);
+  transform: scale(1.02);
 }
 
 .museum-stats {
@@ -887,6 +919,20 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   object-fit: cover;
 }
 
+.artifact-cover::after,
+.dialog-cover::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(232, 223, 212, 0.18), transparent 9rem),
+    linear-gradient(180deg, transparent 52%, rgba(28, 23, 20, 0.18));
+}
+
+.artifact-cover::before,
+.dialog-cover::before,
 .cabinet-plate::before {
   position: absolute;
   inset: 0;
@@ -898,6 +944,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   transition: transform 1100ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
+.artifact-button:hover .artifact-cover::before,
 .cabinet-plate:hover::before {
   transform: translateX(120%);
 }
@@ -951,6 +998,56 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 .artifact-body p:last-child {
   margin-bottom: 0;
   color: var(--muted-foreground);
+}
+
+.curator-mark {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  width: 58px;
+  height: 68px;
+  padding: 10px 7px 9px;
+  color: #E4C980;
+  background:
+    linear-gradient(145deg, rgba(228, 201, 128, 0.16), transparent 44%),
+    linear-gradient(180deg, #30251D, #17120F);
+  border: 1px solid rgba(212, 184, 114, 0.86);
+  clip-path: polygon(18% 0, 82% 0, 100% 15%, 100% 82%, 50% 100%, 0 82%, 0 15%);
+  box-shadow:
+    inset 0 0 0 4px rgba(201, 169, 98, 0.08),
+    0 9px 18px rgba(0, 0, 0, 0.38);
+  isolation: isolate;
+}
+
+.curator-mark::before {
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  content: "";
+  border: 1px solid rgba(201, 169, 98, 0.34);
+  clip-path: inherit;
+}
+
+.curator-mark-monogram {
+  align-self: end;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  text-shadow: 0 2px 10px rgba(201, 169, 98, 0.3);
+}
+
+.curator-mark-label {
+  align-self: start;
+  padding-top: 5px;
+  border-top: 1px solid rgba(201, 169, 98, 0.45);
+  font-family: var(--font-body);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  line-height: 1;
 }
 
 .filter-bar {

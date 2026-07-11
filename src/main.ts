@@ -515,7 +515,7 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
   button.addEventListener("click", () => openArtifactDialog(artifact));
 
   const cover = document.createElement("div");
-  cover.className = "artifact-cover";
+  cover.className = "artifact-cover arch-top sepia-reveal";
   cover.setAttribute("data-motion-image", "");
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);
@@ -538,6 +538,17 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
       <div><dt>标记</dt><dd>${escapeHtml(artifact.rarity)}</dd></div>
     </dl>
   `;
+
+  if (artifact.featured) {
+    const mark = document.createElement("span");
+    mark.className = "curator-mark";
+    mark.setAttribute("aria-label", `精选馆藏：${artifact.rarity}`);
+    mark.innerHTML = `
+      <span class="curator-mark-monogram" aria-hidden="true">M</span>
+      <span class="curator-mark-label" aria-hidden="true">精选</span>
+    `;
+    button.append(mark);
+  }
 
   button.append(cover, body);
   article.append(button);
@@ -654,7 +665,7 @@ export function openArtifactDialog(artifact: Artifact) {
   dialogClosing = false;
 
   const cover = document.createElement("div");
-  cover.className = "dialog-cover";
+  cover.className = "dialog-cover arch-top sepia-reveal";
   cover.setAttribute("data-motion-image", "");
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);

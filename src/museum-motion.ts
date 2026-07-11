@@ -11,6 +11,7 @@ let entryTimeline: gsap.core.Timeline | null = null;
 let dialogTimeline: gsap.core.Timeline | null = null;
 let collectionTimeline: gsap.core.Timeline | null = null;
 let routeTimeline: gsap.core.Timeline | null = null;
+let curatorMarkTween: gsap.core.Tween | null = null;
 let motionInitialized = false;
 let pointerFrame = 0;
 let pointerX = 0;
@@ -129,6 +130,25 @@ function resetMotionElements() {
 function syncLoopPlayback() {
   const shouldPause = document.hidden || shouldReduceMotion();
   ambientTimeline?.paused(shouldPause);
+  curatorMarkTween?.paused(shouldPause);
+}
+
+function initCuratorMarkMotion() {
+  curatorMarkTween?.kill();
+  const marks = motionElements<HTMLElement>(".curator-mark");
+  if (marks.length === 0) return;
+
+  gsap.set(marks, { clearProps: "transform" });
+  curatorMarkTween = gsap.to(marks, {
+    scale: 1.018,
+    y: -1,
+    duration: 5.4,
+    ease: "sine.inOut",
+    repeat: -1,
+    yoyo: true,
+    stagger: 0.3
+  });
+  syncLoopPlayback();
 }
 
 function handleMotionPreferenceChange() {
@@ -341,6 +361,7 @@ function initDesktopParallax() {
 export function refreshMuseumScrollAnimations(skipSection?: HTMLElement) {
   killMuseumScrollAnimations();
   resetMotionElements();
+  initCuratorMarkMotion();
 
   if (shouldReduceMotion()) return;
 
@@ -360,6 +381,7 @@ export function animateCollectionRefresh(container: HTMLElement) {
   const cards = motionElements<HTMLElement>(":scope > [data-motion-item]", container);
   collectionTimeline?.kill();
   clearMotionProps(cards);
+  initCuratorMarkMotion();
 
   if (shouldReduceMotion() || cards.length === 0) return;
 

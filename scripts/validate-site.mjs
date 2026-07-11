@@ -87,10 +87,12 @@ assert(pkg.dependencies?.gsap || pkg.devDependencies?.gsap, "Missing local GSAP 
   assert(css.includes(pattern), `Missing required visual/accessibility pattern: ${pattern}`);
 });
 
-["cover-symbol", "wax-seal", "arch-top", "sepia-reveal"].forEach((pattern) => {
-  assert(!`${main}\n${css}`.includes(pattern), `Cover decoration must not be rendered: ${pattern}`);
+assert(!`${main}\n${css}`.includes("cover-symbol"), "Category symbols must not be rendered over cover images");
+assert(!`${main}\n${css}\n${html}`.includes("wax-seal") && !html.includes("蜡封"), "Wax-seal styling and copy must stay removed");
+["curator-mark", "curator-mark-monogram", "curator-mark-label", "arch-top", "sepia-reveal", "artifact-cover::after", "stage-card::after"].forEach((pattern) => {
+  assert(`${main}\n${css}`.includes(pattern), `Missing restored cover treatment: ${pattern}`);
 });
-assert(!html.includes("蜡封"), "Removed wax-seal decoration must not remain in interface copy");
+assert(html.includes("被馆藏印记收录") && html.includes("列入精选馆藏"), "Missing curator-mark interface copy");
 
 ["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V"].forEach((label) => {
   assert(html.includes(label), `Missing Roman volume label: ${label}`);

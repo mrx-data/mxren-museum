@@ -25,7 +25,7 @@ npm run preview
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, ordered home/featured/collection route entrances, pre-staged scroll reveal, filter refresh, and detail dialog animation.
 - Adaptive Canvas archive-dust atmosphere in `src/museum-canvas.ts`; it pauses when hidden and renders a static low-contrast frame for reduced-motion users.
-- Academia/Classical visual system based on dark wood, parchment, brass, typography, and restrained framing; uploaded cover images render without symbols, seals, gradient overlays, ornamental crops, or sepia filters.
+- Academia/Classical visual system based on dark wood, parchment, brass, typography, brass curator marks, arch-top framing, gradient light, and sepia-to-color interaction; category symbols are not rendered over uploaded covers.
 - No custom Node backend is required. Production deployment remains GitHub Pages.
 
 ## Supabase Persistence
