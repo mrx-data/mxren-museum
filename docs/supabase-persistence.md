@@ -5,6 +5,7 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 - Auth: the full site is hidden behind an entry gate; visitors enter with one click, while admins sign in with a username/password stored in `public.museum_admin_accounts`.
 - Postgres: `public.artifacts` stores artifact metadata.
 - Built-in overrides: `source_artifact_id` links a cloud row to a TypeScript sample artifact, allowing edits without duplicate gallery cards; deleting the override restores the built-in version.
+- Bundled scope: `black-myth-wukong` is the only remaining sample ID; orphaned override rows for removed samples are excluded by the frontend and removed by the cleanup migration.
 - Admin credentials: passwords are stored as `pgcrypto.crypt()` hashes; the frontend never reads the hash.
 - Admin sessions: `public.museum_admin_sessions` stores hashed short-lived session tokens returned by `verify_museum_admin_login`.
 - RLS/RPC: public reads are allowed; writes go through `create_museum_artifact`, `update_museum_artifact`, and `delete_museum_artifact` RPC functions after session verification.
@@ -17,7 +18,8 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 3. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql`.
 4. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
 5. Run `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql`.
-6. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
+6. Run `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql`.
+7. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
 set search_path = public, extensions;
@@ -32,7 +34,7 @@ set
   updated_at = now();
 ```
 
-7. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, edit one built-in artifact, and create a test artifact.
+8. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, edit `黑神话：悟空`, and create a test artifact.
 
 ## Environment
 
@@ -65,6 +67,7 @@ Do not use `sb_secret_...` or legacy `service_role` keys in this Vite app.
 - Missing guest access key: visitors return to the entry gate until they choose `游客进入` again.
 - Missing password-account migration: admin login fails because the `verify_museum_admin_login` RPC does not exist.
 - Missing sample-override migration: built-in artifacts remain visible, but attempting to save an edit cannot create the required `source_artifact_id` override.
+- Missing legacy-sample cleanup migration: removed bundled artifacts stay hidden in the frontend, but historical override rows remain in `public.artifacts` until the cleanup SQL is applied.
 - Missing admin account row: admin login fails and the app remains locked/read-only.
 - Expired admin session: the app clears the stored session and returns to guest read-only mode.
 - GitHub Pages deployment does not need a server change; the browser bundle talks to Supabase directly.

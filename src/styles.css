@@ -59,6 +59,15 @@ body::before {
   contain: strict;
 }
 
+.museum-dust-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.72;
+  mix-blend-mode: screen;
+}
+
 .museum-light,
 .museum-pointer-light {
   position: absolute;
@@ -1807,6 +1816,10 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 
   .museum-atmosphere {
     opacity: 0.28;
+  }
+
+  .museum-dust-canvas {
+    opacity: 0.2;
   }
 
   .museum-light,

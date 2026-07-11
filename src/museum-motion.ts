@@ -10,6 +10,7 @@ let ambientTimeline: gsap.core.Timeline | null = null;
 let entryTimeline: gsap.core.Timeline | null = null;
 let dialogTimeline: gsap.core.Timeline | null = null;
 let collectionTimeline: gsap.core.Timeline | null = null;
+let routeTimeline: gsap.core.Timeline | null = null;
 let waxSealTween: gsap.core.Tween | null = null;
 let motionInitialized = false;
 let pointerFrame = 0;
@@ -50,6 +51,68 @@ function killMuseumScrollAnimations() {
       trigger.kill();
     }
   });
+}
+
+function routeMotionGroups(section: HTMLElement) {
+  if (section.matches("[data-motion-hero]")) {
+    const intro = motionElements<HTMLElement>(
+      ":scope > .hero-copy > .volume-label, :scope > .hero-copy > [data-motion-title], :scope > .hero-copy > .hero-lede",
+      section
+    );
+    const controls = motionElements<HTMLElement>(":scope > .hero-copy > .hero-actions", section);
+    const content = motionElements<HTMLElement>(
+      ":scope > .hero-cabinet > .hero-stage-card, :scope > .hero-cabinet > .museum-stats > div",
+      section
+    );
+    return { intro, controls, content, all: [...intro, ...controls, ...content] };
+  }
+
+  const heading = section.querySelector<HTMLElement>(".section-heading");
+  const intro = heading
+    ? motionElements<HTMLElement>(":scope > .volume-label, :scope > [data-motion-title], :scope > p:not(.volume-label)", heading)
+    : [];
+  const controls = motionElements<HTMLElement>(
+    ":scope > .category-index > *, :scope > .manager-search, :scope > .filter-bar > *, :scope > .management-panel > .auth-panel",
+    section
+  );
+  const content = motionElements<HTMLElement>(
+    ":scope > .featured-grid > [data-motion-item], :scope > .collection-grid > [data-motion-item], :scope > .management-panel > *:not(.auth-panel)",
+    section
+  );
+
+  return { intro, controls, content, all: [...intro, ...controls, ...content] };
+}
+
+export function animateMuseumRoute(section: HTMLElement) {
+  routeTimeline?.kill();
+  routeTimeline = null;
+
+  const groups = routeMotionGroups(section);
+  clearMotionProps(groups.all);
+  if (shouldReduceMotion() || groups.all.length === 0) return;
+
+  prepareMotionElements(groups.all);
+  if (groups.intro.length > 0) gsap.set(groups.intro, { autoAlpha: 0, y: 18 });
+  if (groups.controls.length > 0) gsap.set(groups.controls, { autoAlpha: 0, y: 16 });
+  if (groups.content.length > 0) gsap.set(groups.content, { autoAlpha: 0, y: 28, scale: 0.992 });
+
+  routeTimeline = gsap.timeline({
+    defaults: { ease: "power3.out" },
+    onComplete: () => {
+      clearMotionProps(groups.all);
+      routeTimeline = null;
+    }
+  });
+
+  if (groups.intro.length > 0) {
+    routeTimeline.to(groups.intro, { autoAlpha: 1, y: 0, duration: 0.56, stagger: 0.075 });
+  }
+  if (groups.controls.length > 0) {
+    routeTimeline.to(groups.controls, { autoAlpha: 1, y: 0, duration: 0.48, stagger: 0.055 }, groups.intro.length ? "-=0.16" : 0);
+  }
+  if (groups.content.length > 0) {
+    routeTimeline.to(groups.content, { autoAlpha: 1, y: 0, scale: 1, duration: 0.68, stagger: 0.075 }, groups.controls.length ? "-=0.12" : "+=0.06");
+  }
 }
 
 function revealAllMotionElements() {
@@ -207,37 +270,46 @@ function initSectionTimeline(section: HTMLElement, index: number) {
   const animated = [...headingCopy, title, noteLedger, ...images, ...items]
     .filter((element): element is HTMLElement => Boolean(element));
 
+  prepareMotionElements(animated);
+  if (headingCopy.length > 0) gsap.set(headingCopy, { autoAlpha: 0, y: 20 });
+  if (title) gsap.set(title, { autoAlpha: 0, y: 28, clipPath: "inset(0 0 100% 0)" });
+  if (noteLedger) gsap.set(noteLedger, { autoAlpha: 0, y: 24 });
+  if (images.length > 0) gsap.set(images, { autoAlpha: 0, scale: 1.025, clipPath: "inset(9% 0 9% 0)" });
+  if (items.length > 0) gsap.set(items, { autoAlpha: 0, y: 24 });
+
   const timeline = gsap.timeline({
-    scrollTrigger: {
-      id: `museum-section-${index}`,
-      trigger: section,
-      start: "top 80%",
-      onEnter: () => prepareMotionElements(animated),
-      once: true
-    },
-    defaults: { ease: "power4.out", immediateRender: false },
+    paused: true,
+    defaults: { ease: "power4.out" },
     onComplete: () => clearMotionProps(animated)
   });
 
   if (headingCopy.length > 0) {
-    timeline.from(headingCopy, { autoAlpha: 0, y: 20, duration: 0.58, stagger: 0.07 });
+    timeline.to(headingCopy, { autoAlpha: 1, y: 0, duration: 0.58, stagger: 0.07 });
   }
 
   if (title) {
-    timeline.from(title, { autoAlpha: 0, y: 28, clipPath: "inset(0 0 100% 0)", duration: 0.72 }, headingCopy.length > 0 ? "-=0.3" : 0);
+    timeline.to(title, { autoAlpha: 1, y: 0, clipPath: "inset(0 0 0% 0)", duration: 0.72 }, headingCopy.length > 0 ? "-=0.3" : 0);
   }
 
   if (noteLedger) {
-    timeline.from(noteLedger, { autoAlpha: 0, y: 24, duration: 0.68 }, title ? "-=0.4" : 0);
+    timeline.to(noteLedger, { autoAlpha: 1, y: 0, duration: 0.68 }, title ? "-=0.4" : 0);
   }
 
   if (images.length > 0) {
-    timeline.from(images, { autoAlpha: 0, scale: 1.025, clipPath: "inset(9% 0 9% 0)", duration: 0.78, stagger: 0.07 }, "-=0.3");
+    timeline.to(images, { autoAlpha: 1, scale: 1, clipPath: "inset(0% 0 0% 0)", duration: 0.78, stagger: 0.07 }, "-=0.3");
   }
 
   if (items.length > 0) {
-    timeline.from(items, { autoAlpha: 0, y: 24, duration: 0.7, stagger: 0.075 }, "-=0.4");
+    timeline.to(items, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.075 }, "-=0.4");
   }
+
+  ScrollTrigger.create({
+    id: `museum-section-${index}`,
+    trigger: section,
+    start: "top 80%",
+    animation: timeline,
+    once: true
+  });
 }
 
 function initDividerTimelines() {
@@ -286,7 +358,7 @@ function initDesktopParallax() {
   });
 }
 
-export function refreshMuseumScrollAnimations() {
+export function refreshMuseumScrollAnimations(skipSection?: HTMLElement) {
   killMuseumScrollAnimations();
   resetMotionElements();
   initWaxSealMotion();
@@ -295,7 +367,7 @@ export function refreshMuseumScrollAnimations() {
 
   scrollMotionContext = gsap.context(() => {
     motionElements<HTMLElement>("[data-motion-section]").forEach((section, index) => {
-      if (section.matches(".site-header") || isHiddenByRoute(section)) return;
+      if (section.matches(".site-header") || section === skipSection || isHiddenByRoute(section)) return;
       initSectionTimeline(section, index);
     });
 
@@ -391,6 +463,6 @@ export function initMuseumMotion() {
     reduceMotionQuery.addEventListener("change", handleMotionPreferenceChange);
   }
 
-  playMuseumEntry();
   refreshMuseumScrollAnimations();
+  playMuseumEntry();
 }

@@ -23,10 +23,12 @@ import {
   animateCollectionRefresh,
   animateArtifactDialog,
   animateArtifactDialogClose,
+  animateMuseumRoute,
   initMuseumMotion,
   playMuseumEntry,
   refreshMuseumScrollAnimations
 } from "./museum-motion";
+import { initMuseumCanvas } from "./museum-canvas";
 
 type FilterId = "all" | ArtifactCategory;
 type MuseumRoute = "home" | "collection" | "manage";
@@ -201,13 +203,19 @@ function sameRouteState(first: RouteState | null, second: RouteState) {
   return first?.route === second.route && first.targetId === second.targetId;
 }
 
-function scheduleMuseumScrollRefresh() {
+function scheduleMuseumScrollRefresh(skipSection?: HTMLElement) {
   if (motionRefreshFrame) return;
 
   motionRefreshFrame = requestAnimationFrame(() => {
     motionRefreshFrame = 0;
-    refreshMuseumScrollAnimations();
+    refreshMuseumScrollAnimations(skipSection);
   });
+}
+
+function scrollToRouteTarget(target: HTMLElement, smooth: boolean) {
+  const headerOffset = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 0;
+  const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - headerOffset - 20);
+  window.scrollTo({ top, behavior: smooth ? "smooth" : "instant" as ScrollBehavior });
 }
 
 function setActiveNavigation({ route, targetId }: RouteState) {
@@ -240,15 +248,17 @@ function showRoutePage(routeState: RouteState, shouldScroll = true, shouldRefres
 
   setActiveNavigation(routeState);
 
-  requestAnimationFrame(() => {
-    if (shouldScroll) {
-      document.getElementById(routeState.targetId)?.scrollIntoView({ block: "start" });
-    }
+  const target = document.getElementById(routeState.targetId);
+  const routeSection = target?.closest<HTMLElement>("[data-motion-section]") ?? target;
 
-    if (needsMotionRefresh) {
-      scheduleMuseumScrollRefresh();
-    }
-  });
+  if (target && shouldScroll) {
+    scrollToRouteTarget(target, !routeChanged);
+  }
+
+  if (needsMotionRefresh) {
+    refreshMuseumScrollAnimations(routeSection ?? undefined);
+    if (routeSection) animateMuseumRoute(routeSection);
+  }
 }
 
 function syncRouteFromHash(shouldScroll = true, shouldRefreshMotion = true) {
@@ -280,7 +290,7 @@ export function mergeArtifacts(samples: Artifact[], managed: ManagedArtifact[]) 
   const sampleIds = new Set(samples.map((artifact) => artifact.id));
   return [
     ...samples.map((artifact) => managedById.get(artifact.id) ?? artifact),
-    ...managed.filter((artifact) => !sampleIds.has(artifact.id))
+    ...managed.filter((artifact) => !sampleIds.has(artifact.id) && !artifact.sourceArtifactId)
   ];
 }
 
@@ -412,11 +422,14 @@ function renderAuthState(updateManagerStatus = true) {
     return;
   }
 
-  syncRouteFromHash(false, false);
-  scheduleMuseumScrollRefresh();
+  syncRouteFromHash(true, false);
   if (isUnlockTransition) {
-    requestAnimationFrame(() => playMuseumEntry());
+    const hero = document.querySelector<HTMLElement>("[data-motion-hero]");
+    refreshMuseumScrollAnimations(hero ?? undefined);
+    playMuseumEntry();
+    return;
   }
+  scheduleMuseumScrollRefresh();
 }
 
 function refreshMuseumView() {
@@ -1195,6 +1208,7 @@ function updateCounts() {
 }
 
 function initMuseum() {
+  initMuseumCanvas();
   updateCounts();
   renderHeroStage();
   renderFeatured();

@@ -16,14 +16,15 @@ npm run preview
 ## Current Scope
 
 - Static Vite + TypeScript frontend.
-- Local sample collection data in `src/collection.ts`.
-- Generated local PNG artifact assets in `public/artifacts`, wired into cover cards and detail gallery strips.
+- One bundled artifact in `src/collection.ts`: `黑神话：悟空`.
+- The user-provided `public/artifacts/blackMyth.png`, wired into its cover and detail gallery.
 - Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres RPC.
 - Built-in artifacts can be edited through cloud override rows keyed by `source_artifact_id`; the original TypeScript entries remain as recoverable defaults and are not duplicated in the gallery.
 - Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
 - Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
-- Local GSAP motion system in `src/museum-motion.ts` for ambient background, opening, scroll reveal, filter refresh, and detail dialog animation.
+- Local GSAP motion system in `src/museum-motion.ts` for ambient background, ordered home/featured/collection route entrances, pre-staged scroll reveal, filter refresh, and detail dialog animation.
+- Adaptive Canvas archive-dust atmosphere in `src/museum-canvas.ts`; it pauses when hidden and renders a static low-contrast frame for reduced-motion users.
 - Academia/Classical visual system based on dark wood, parchment, brass, crimson wax seals, arch-top covers, and sepia-to-color image treatment.
 - No custom Node backend is required. Production deployment remains GitHub Pages.
 
@@ -46,7 +47,8 @@ One-time Supabase setup:
 2. Run `supabase/migrations/20260706010000_museum_admin_role_lookup.sql` for compatibility with earlier deployments.
 3. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
 4. Run `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql`.
-5. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+5. Run `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql`.
+6. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 
@@ -84,13 +86,14 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | Path | Purpose |
 | --- | --- |
 | `index.html` | Semantic shell and museum sections |
-| `src/collection.ts` | Typed sample artifact data |
+| `src/collection.ts` | Shared artifact types and the single bundled `黑神话：悟空` artifact |
 | `src/supabase-client.ts` | Supabase client and publishable-key configuration |
 | `src/artifact-store.ts` | Supabase artifact query, admin-login RPC helpers, artifact CRUD RPC, and browser-local fallback |
 | `src/main.ts` | Entry gate, access state, rendering, filters, counts, management behavior, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
+| `src/museum-canvas.ts` | Responsive, reduced-motion-aware archive-dust Canvas background |
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
-| `public/artifacts/` | Generated local PNG placeholder covers and detail images |
+| `public/artifacts/` | User-provided `blackMyth.png` used by the remaining bundled artifact |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
 | `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, built-in artifact overrides, and Storage compatibility policies |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |

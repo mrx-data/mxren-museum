@@ -39,6 +39,7 @@ function assert(condition, message) {
   "supabase/migrations/20260706010000_museum_admin_role_lookup.sql",
   "supabase/migrations/20260707010000_museum_admin_password_accounts.sql",
   "supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql",
+  "supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -61,6 +62,7 @@ const supabaseMigration = read("supabase/migrations/20260706000000_museum_artifa
 const supabaseRoleMigration = read("supabase/migrations/20260706010000_museum_admin_role_lookup.sql");
 const supabasePasswordMigration = read("supabase/migrations/20260707010000_museum_admin_password_accounts.sql");
 const supabaseOverrideMigration = read("supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql");
+const removeLegacySamplesMigration = read("supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
@@ -109,14 +111,16 @@ assert(html.includes("Crimson+Pro"), "Missing Crimson Pro font link");
 assert(html.includes("Cinzel"), "Missing Cinzel font link");
 
 const itemCount = (collection.match(/\btitle: "/g) || []).length;
-assert(itemCount >= 9, `Expected at least 9 artifacts, found ${itemCount}`);
+assert(itemCount === 1, `Expected exactly 1 built-in artifact, found ${itemCount}`);
+assert(collection.includes('id: "black-myth-wukong"'), "Black Myth: Wukong must remain as the built-in artifact");
+assert(collection.includes('title: "黑神话：悟空"'), "Missing Black Myth: Wukong built-in artifact");
 
 [
   "games",
   "landscapes",
   "personal-works"
 ].forEach((category) => {
-  assert(collection.includes(`category: "${category}"`), `Missing artifact category: ${category}`);
+  assert(collection.includes(`id: "${category}"`), `Missing artifact category option: ${category}`);
 });
 
 [
@@ -206,6 +210,7 @@ assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animat
   "playMuseumEntry",
   "refreshMuseumScrollAnimations",
   "animateCollectionRefresh",
+  "animateMuseumRoute",
   "animateArtifactDialog",
   "animateArtifactDialogClose",
   "gsap.quickTo",
@@ -216,8 +221,14 @@ assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animat
 });
 
 assert(css.includes(".museum-atmosphere"), "Missing ambient motion layer styling");
+assert(html.includes("data-museum-canvas"), "Missing museum dust canvas");
+assert(exists("src/museum-canvas.ts"), "Missing museum canvas module");
+assert(main.includes("initMuseumCanvas"), "Missing museum canvas initialization");
+assert(css.includes(".museum-dust-canvas"), "Missing museum dust canvas styling");
 assert(css.includes(".museum-pointer-light"), "Missing pointer light styling");
 assert(css.includes(".motion-reveal"), "Missing motion reveal styling");
+assert(motion.includes("animation: timeline"), "Scroll reveals must prepare their initial state before playback");
+assert(motion.indexOf("refreshMuseumScrollAnimations();") < motion.lastIndexOf("playMuseumEntry();"), "Museum entry must start after scroll animation reset");
 assert(main.includes("searchDebounceTimer"), "Missing collection search debounce");
 assert(main.includes("fetchpriority"), "Missing high-priority hero image loading");
 
@@ -389,6 +400,14 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "create or replace function public.update_museum_artifact"
 ].forEach((pattern) => {
   assert(supabaseOverrideMigration.includes(pattern), `Missing sample artifact override migration pattern: ${pattern}`);
+});
+
+[
+  "delete from public.artifacts",
+  "source_artifact_id is not null",
+  "source_artifact_id <> 'black-myth-wukong'"
+].forEach((pattern) => {
+  assert(removeLegacySamplesMigration.includes(pattern), `Missing legacy sample cleanup migration pattern: ${pattern}`);
 });
 
 [
