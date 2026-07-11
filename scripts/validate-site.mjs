@@ -78,16 +78,17 @@ assert(pkg.dependencies?.gsap || pkg.devDependencies?.gsap, "Missing local GSAP 
 [
   "paper-texture",
   "vignette",
-  "arch-top",
-  "sepia",
   "corner-flourish",
   "ornate-divider",
-  "wax-seal",
   "drop-cap",
   "prefers-reduced-motion",
   ":focus-visible"
 ].forEach((pattern) => {
   assert(css.includes(pattern), `Missing required visual/accessibility pattern: ${pattern}`);
+});
+
+["cover-symbol", "wax-seal", "arch-top", "sepia-reveal"].forEach((pattern) => {
+  assert(!`${main}\n${css}`.includes(pattern), `Cover decoration must not be rendered: ${pattern}`);
 });
 
 ["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V"].forEach((label) => {

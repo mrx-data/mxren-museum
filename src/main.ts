@@ -501,7 +501,6 @@ function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
   if (artifact.coverImage) {
     cover.append(createImageElement(artifact.coverImage, artifact.coverAlt));
   }
-  cover.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
 }
 
 function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequenceIndex: number) {
@@ -516,7 +515,7 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
   button.addEventListener("click", () => openArtifactDialog(artifact));
 
   const cover = document.createElement("div");
-  cover.className = "artifact-cover arch-top sepia-reveal";
+  cover.className = "artifact-cover";
   cover.setAttribute("data-motion-image", "");
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);
@@ -539,14 +538,6 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
       <div><dt>标记</dt><dd>${escapeHtml(artifact.rarity)}</dd></div>
     </dl>
   `;
-
-  if (artifact.featured) {
-    const seal = document.createElement("span");
-    seal.className = "wax-seal";
-    seal.setAttribute("aria-label", artifact.rarity);
-    seal.textContent = "★";
-    button.append(seal);
-  }
 
   button.append(cover, body);
   article.append(button);
@@ -572,7 +563,6 @@ function renderHeroStage() {
       if (artifact.coverImage) {
         button.append(createImageElement(artifact.coverImage, artifact.coverAlt, "eager", index === 0));
       }
-      button.insertAdjacentHTML("beforeend", `<span class="cover-symbol" aria-hidden="true">${escapeHtml(artifact.symbol)}</span>`);
       return button;
     })
   );
@@ -664,7 +654,7 @@ export function openArtifactDialog(artifact: Artifact) {
   dialogClosing = false;
 
   const cover = document.createElement("div");
-  cover.className = "dialog-cover arch-top sepia-reveal";
+  cover.className = "dialog-cover";
   cover.setAttribute("data-motion-image", "");
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);

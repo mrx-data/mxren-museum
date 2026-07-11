@@ -11,7 +11,6 @@ let entryTimeline: gsap.core.Timeline | null = null;
 let dialogTimeline: gsap.core.Timeline | null = null;
 let collectionTimeline: gsap.core.Timeline | null = null;
 let routeTimeline: gsap.core.Timeline | null = null;
-let waxSealTween: gsap.core.Tween | null = null;
 let motionInitialized = false;
 let pointerFrame = 0;
 let pointerX = 0;
@@ -130,7 +129,6 @@ function resetMotionElements() {
 function syncLoopPlayback() {
   const shouldPause = document.hidden || shouldReduceMotion();
   ambientTimeline?.paused(shouldPause);
-  waxSealTween?.paused(shouldPause);
 }
 
 function handleMotionPreferenceChange() {
@@ -192,24 +190,6 @@ function initAmbientMotion() {
 
   document.documentElement.addEventListener("pointerleave", () => {
     showPointerLight(0);
-  });
-  syncLoopPlayback();
-}
-
-function initWaxSealMotion() {
-  waxSealTween?.kill();
-  const seals = motionElements<HTMLElement>(".wax-seal");
-  if (seals.length === 0) return;
-
-  gsap.set(seals, { clearProps: "transform" });
-  waxSealTween = gsap.to(seals, {
-    scale: 1.028,
-    rotate: 0.8,
-    duration: 4.2,
-    ease: "sine.inOut",
-    repeat: -1,
-    yoyo: true,
-    stagger: 0.24
   });
   syncLoopPlayback();
 }
@@ -361,7 +341,6 @@ function initDesktopParallax() {
 export function refreshMuseumScrollAnimations(skipSection?: HTMLElement) {
   killMuseumScrollAnimations();
   resetMotionElements();
-  initWaxSealMotion();
 
   if (shouldReduceMotion()) return;
 
@@ -381,7 +360,6 @@ export function animateCollectionRefresh(container: HTMLElement) {
   const cards = motionElements<HTMLElement>(":scope > [data-motion-item]", container);
   collectionTimeline?.kill();
   clearMotionProps(cards);
-  initWaxSealMotion();
 
   if (shouldReduceMotion() || cards.length === 0) return;
 
