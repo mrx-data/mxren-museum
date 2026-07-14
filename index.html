@@ -243,7 +243,13 @@
               </div>
 
               <div class="form-actions">
-                <button class="button button-primary" type="submit">保存藏品</button>
+                <button class="button button-primary artifact-save-button" id="artifact-save-button" type="submit" data-saving="false">
+                  <span class="save-button-idle">保存藏品</span>
+                  <span class="save-button-busy" aria-live="polite">
+                    <span class="save-progress-seal" aria-hidden="true"></span>
+                    <span>正在保存</span>
+                  </span>
+                </button>
                 <button class="button button-secondary" id="artifact-form-reset" type="button">清空表单</button>
               </div>
             </form>
@@ -299,6 +305,19 @@
         </figure>
         <button class="image-lightbox-nav image-lightbox-next" type="button" aria-label="查看下一张详情图片">›</button>
         <span id="image-lightbox-counter" class="image-lightbox-counter" aria-live="polite"></span>
+      </dialog>
+
+      <dialog id="artifact-save-error" class="save-error-dialog" aria-labelledby="save-error-title" aria-describedby="save-error-message">
+        <div class="save-error-frame">
+          <button class="save-error-close" type="button" aria-label="关闭保存失败提示">×</button>
+          <div class="save-error-mark" aria-hidden="true"><span>!</span></div>
+          <p class="volume-label">Archive notice</p>
+          <h2 id="save-error-title">藏品未保存</h2>
+          <p id="save-error-message" class="save-error-message"></p>
+          <div class="save-error-actions">
+            <button class="button button-secondary" id="save-error-confirm" type="button">返回修改</button>
+          </div>
+        </div>
       </dialog>
     </div>
 

@@ -123,7 +123,12 @@ const artifactGalleryPreview = document.querySelector<HTMLElement>("#artifact-ga
 const artifactManagerList = document.querySelector<HTMLElement>("#artifact-manager-list");
 const artifactManagerListTitle = document.querySelector<HTMLElement>("#manager-list-title");
 const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-manager-status");
+const artifactSaveButton = document.querySelector<HTMLButtonElement>("#artifact-save-button");
 const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
+const artifactSaveError = document.querySelector<HTMLDialogElement>("#artifact-save-error");
+const artifactSaveErrorMessage = document.querySelector<HTMLElement>("#save-error-message");
+const artifactSaveErrorClose = document.querySelector<HTMLButtonElement>(".save-error-close");
+const artifactSaveErrorConfirm = document.querySelector<HTMLButtonElement>("#save-error-confirm");
 const authSignOut = document.querySelector<HTMLButtonElement>("#auth-sign-out");
 const authStatus = document.querySelector<HTMLElement>("#auth-status");
 const pageElements = Array.from(document.querySelectorAll<HTMLElement>("[data-page]"));
@@ -382,8 +387,36 @@ function setManagementControlsDisabled() {
       "input, select, textarea, button"
     )
     .forEach((control) => {
-      control.disabled = !canManage;
+      control.disabled = !canManage || isSavingArtifact;
     });
+}
+
+function setArtifactSavingState(saving: boolean) {
+  isSavingArtifact = saving;
+  artifactForm?.setAttribute("aria-busy", String(saving));
+
+  if (artifactSaveButton) {
+    artifactSaveButton.dataset.saving = String(saving);
+    artifactSaveButton.setAttribute("aria-busy", String(saving));
+    artifactSaveButton.setAttribute("aria-label", saving ? "正在保存藏品" : "保存藏品");
+  }
+
+  setManagementControlsDisabled();
+}
+
+function showArtifactSaveError(detail: string) {
+  if (!artifactSaveError || !artifactSaveErrorMessage) return;
+
+  artifactSaveErrorMessage.textContent = detail;
+  if (!artifactSaveError.open) artifactSaveError.showModal();
+  artifactSaveErrorConfirm?.focus();
+}
+
+function closeArtifactSaveError() {
+  if (!artifactSaveError?.open) return;
+
+  artifactSaveError.close();
+  artifactSaveButton?.focus({ preventScroll: true });
 }
 
 function renderAuthState(updateManagerStatus = true) {
@@ -1046,7 +1079,7 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
   const input = artifactFormInput();
   if (!input) return;
 
-  isSavingArtifact = true;
+  setArtifactSavingState(true);
   try {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
     if (persistenceMode === "supabase" && adminSession) {
@@ -1082,8 +1115,9 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
     showManagerStatus(`藏品未保存：${detail}`, "danger");
+    showArtifactSaveError(detail);
   } finally {
-    isSavingArtifact = false;
+    setArtifactSavingState(false);
   }
 }
 
@@ -1261,6 +1295,16 @@ function bindDialogEvents() {
   imageLightbox?.addEventListener("cancel", (event) => {
     event.preventDefault();
     closeImageLightbox();
+  });
+
+  artifactSaveErrorClose?.addEventListener("click", closeArtifactSaveError);
+  artifactSaveErrorConfirm?.addEventListener("click", closeArtifactSaveError);
+  artifactSaveError?.addEventListener("click", (event) => {
+    if (event.target === artifactSaveError) closeArtifactSaveError();
+  });
+  artifactSaveError?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeArtifactSaveError();
   });
 
   document.addEventListener("keydown", (event) => {

@@ -113,6 +113,8 @@ assert(html.includes("<nav"), "Missing semantic nav");
 assert(html.includes("<main"), "Missing semantic main");
 assert(html.includes("<dialog"), "Missing artifact detail dialog");
 assert(html.includes('id="image-lightbox"'), "Missing detail image lightbox");
+assert(html.includes('id="artifact-save-button"'), "Missing artifact save feedback button");
+assert(html.includes('id="artifact-save-error"'), "Missing artifact save error dialog");
 assert(html.includes("id=\"app\""), "Missing app mount point");
 assert(html.includes("id=\"access-gate\""), "Missing access gate");
 assert(html.includes("id=\"gate-guest-access\""), "Missing gate guest access control");
@@ -161,6 +163,8 @@ assert(collection.includes('title: "黑神话：悟空"'), "Missing Black Myth: 
 assert(css.includes("dialog-image-strip"), "Missing dialog image strip styling");
 assert(css.includes(".image-zoom-trigger"), "Missing detail image zoom trigger styling");
 assert(css.includes(".image-lightbox-figure img"), "Missing full-size lightbox image styling");
+assert(css.includes('.artifact-save-button[data-saving="true"]'), "Missing artifact save pending styling");
+assert(css.includes(".save-error-dialog"), "Missing themed artifact save error styling");
 assert(css.includes(".access-gate"), "Missing access gate styling");
 assert(css.includes('body[data-access-role="locked"]'), "Missing locked access styling");
 assert(css.includes(".manager-readonly"), "Missing read-only manager badge styling");
@@ -385,6 +389,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 [
   "createImagePreviewUrl",
   "handleArtifactSubmit",
+  "setArtifactSavingState",
+  "showArtifactSaveError",
   "handleArtifactDelete",
   "handleArtifactEdit",
   "mergeArtifacts",
