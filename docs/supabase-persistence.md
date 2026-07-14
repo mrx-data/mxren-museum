@@ -57,7 +57,7 @@ Do not use `sb_secret_...` or legacy `service_role` keys in this Vite app.
 
 The migration utility reads secrets only from the current process environment. Do not place them in Vite-prefixed variables or commit them.
 
-Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the current shell without writing them to a file, then run:
+Create a dedicated `sb_secret_...` key in Supabase Settings > API Keys, then set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in the current shell without writing them to a file. Do not use a key that has appeared in chat, logs, or source control.
 
 ```bash
 npm run migrate:artifact-images -- --dry-run
@@ -69,7 +69,7 @@ npm run migrate:artifact-images -- --execute
 npm run migrate:artifact-images -- --cleanup --backup-confirmed
 ```
 
-`--execute` is idempotent and keeps legacy Base64 as a temporary fallback. `--cleanup` verifies every referenced Storage object before clearing legacy payloads. Never run cleanup without a verified database backup.
+`--execute` is idempotent and keeps legacy Base64 as a temporary fallback. `--cleanup` verifies every referenced Storage object before clearing legacy payloads. Never run cleanup without a verified database backup. The legacy `SUPABASE_SERVICE_ROLE_KEY` variable remains a temporary compatibility fallback but should not be used for new operations.
 
 ## Verification
 

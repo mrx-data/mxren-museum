@@ -41,7 +41,7 @@ Supabase browser client variables:
 | `VITE_SUPABASE_URL` | Supabase project URL | Public frontend value |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key | Public frontend key; never replace with a secret key |
 
-The local migration utility additionally accepts `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as process-only variables. Never read, print, or commit their values.
+The local migration utility accepts `SUPABASE_URL` and a dedicated `SUPABASE_SECRET_KEY` as process-only variables, with `SUPABASE_SERVICE_ROLE_KEY` retained only as a legacy compatibility fallback. Never read, print, or commit their values.
 
 Rules:
 
@@ -69,7 +69,7 @@ Rules:
 - `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql` adds unique `source_artifact_id` overrides so admins can edit built-in artifacts without duplicating cards; deleting an override restores the TypeScript default.
 - `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql` deletes cloud override rows for removed sample IDs while preserving `black-myth-wukong`.
 - `supabase/migrations/20260713010000_artifact_storage_images.sql` adds cover thumbnail paths, removes direct client mutation policies, and makes metadata RPCs reject new Base64 payloads and foreign artifact paths.
-- `supabase/functions/artifact-images/index.ts` verifies `X-Museum-Session` and uses its runtime Service Role secret only to create signed uploads or delete owned objects.
+- `supabase/functions/artifact-images/index.ts` verifies `X-Museum-Session` and prefers the runtime `SUPABASE_SECRET_KEYS` value to create signed uploads or delete owned objects; legacy Service Role is fallback-only.
 - `scripts/migrate-artifact-images.mjs` migrates historical Base64 with `--dry-run`, `--execute`, and guarded `--cleanup --backup-confirmed` modes.
 - Production Supabase status (2026-07-14): all repository migrations through `20260713010000` are applied and `artifact-images` Function version 1 is active; historical Base64 execute/cleanup remains pending and must not run without process-only Service Role variables plus a verified backup.
 - To allow writes, create an admin row in `public.museum_admin_accounts` from Supabase SQL Editor after setting `search_path = public, extensions`, then use `crypt('<admin-password>', gen_salt('bf', 12))`. Do not commit filled password SQL, `sb_secret_...`, or legacy `service_role` keys. Public reads are allowed; writes go through admin-session RPC.

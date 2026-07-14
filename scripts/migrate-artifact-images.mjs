@@ -12,12 +12,12 @@ if (mode === "--cleanup" && !process.argv.includes("--backup-confirmed")) {
 }
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
+const elevatedKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !elevatedKey) {
+  throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY are required");
 }
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+const supabase = createClient(supabaseUrl, elevatedKey, { auth: { persistSession: false } });
 const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/s;
 
 function decodeDataUrl(value) {

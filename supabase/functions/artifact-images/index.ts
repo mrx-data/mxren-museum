@@ -29,6 +29,20 @@ function json(body: unknown, status: number, origin: string | null) {
   });
 }
 
+function elevatedApiKey() {
+  const serializedSecretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (serializedSecretKeys) {
+    try {
+      const secretKeys = JSON.parse(serializedSecretKeys) as Record<string, string>;
+      const secretKey = secretKeys.default ?? Object.values(secretKeys)[0];
+      if (secretKey) return secretKey;
+    } catch {
+      // Fall through for projects that have not enabled the new key model yet.
+    }
+  }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+}
+
 Deno.serve(async (request) => {
   const origin = request.headers.get("Origin");
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -38,9 +52,9 @@ Deno.serve(async (request) => {
   if (!sessionToken) return json({ error: "Museum admin session required" }, 401, origin);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return json({ error: "Storage service is not configured" }, 500, origin);
-  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  const secretKey = elevatedApiKey();
+  if (!supabaseUrl || !secretKey) return json({ error: "Storage service is not configured" }, 500, origin);
+  const supabase = createClient(supabaseUrl, secretKey, { auth: { persistSession: false } });
   const { data: validSession, error: sessionError } = await supabase.rpc("verify_museum_admin_session", {
     input_session_token: sessionToken
   });
