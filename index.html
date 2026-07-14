@@ -97,6 +97,14 @@
           <aside class="hero-cabinet" aria-label="藏馆摘要">
             <div class="hero-stage-card corner-flourish" data-motion-image>
               <div class="stage-rack" id="hero-stage-gallery" aria-label="精选藏品海报舞台"></div>
+              <div class="stage-carousel-controls" id="hero-stage-controls" aria-label="精选藏品轮播控制" hidden>
+                <button id="hero-stage-previous" type="button" aria-label="查看上一件精选藏品">‹</button>
+                <span id="hero-stage-position" class="stage-carousel-position" aria-label="第 1 件，共 1 件">01 / 01</span>
+                <button id="hero-stage-next" type="button" aria-label="查看下一件精选藏品">›</button>
+                <button id="hero-stage-toggle" class="stage-carousel-toggle" type="button" aria-label="暂停轮播" aria-pressed="false">
+                  <span aria-hidden="true">Ⅱ</span>
+                </button>
+              </div>
               <div class="stage-caption" id="hero-stage-caption" aria-live="polite">
                 <span>展厅 01</span>
                 <strong>正在布展</strong>

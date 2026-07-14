@@ -76,6 +76,17 @@ let renderedAccessRole: AccessRole | null = null;
 let activeLightboxImages: Artifact["galleryImages"] = [];
 let activeLightboxIndex = 0;
 let lightboxTrigger: HTMLElement | null = null;
+let heroStagedArtifacts: Artifact[] = [];
+let heroStageActiveIndex = 0;
+let heroStageAutoplayTimer = 0;
+let heroStageCaptionTimer = 0;
+let heroStageTransitionTimer = 0;
+let heroStageAnimating = false;
+let heroStageUserPaused = false;
+let heroStageInteractionPaused = false;
+const heroStageMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const HERO_STAGE_AUTOPLAY_DELAY = 6800;
+const HERO_STAGE_TRANSITION_DURATION = 860;
 const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
 const accessGate = document.querySelector<HTMLElement>("#access-gate");
@@ -90,6 +101,12 @@ const artifactCount = document.querySelector<HTMLElement>("#artifact-count");
 const categoryCount = document.querySelector<HTMLElement>("#category-count");
 const heroStageGallery = document.querySelector<HTMLElement>("#hero-stage-gallery");
 const heroStageCaption = document.querySelector<HTMLElement>("#hero-stage-caption");
+const heroStageHost = heroStageGallery?.closest<HTMLElement>(".hero-stage-card") ?? null;
+const heroStageControls = document.querySelector<HTMLElement>("#hero-stage-controls");
+const heroStagePrevious = document.querySelector<HTMLButtonElement>("#hero-stage-previous");
+const heroStageNext = document.querySelector<HTMLButtonElement>("#hero-stage-next");
+const heroStageToggle = document.querySelector<HTMLButtonElement>("#hero-stage-toggle");
+const heroStagePosition = document.querySelector<HTMLElement>("#hero-stage-position");
 const featuredGallery = document.querySelector<HTMLElement>("#featured-gallery");
 const categoryIndex = document.querySelector<HTMLElement>("#category-index");
 const filterBar = document.querySelector<HTMLElement>("#filter-bar");
@@ -605,19 +622,134 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
   return article;
 }
 
+function stopHeroStageAutoplay() {
+  window.clearTimeout(heroStageAutoplayTimer);
+  heroStageAutoplayTimer = 0;
+  heroStageControls?.classList.remove("is-cycling");
+}
+
+function isHeroStageAutoplayPaused() {
+  return heroStageUserPaused || heroStageInteractionPaused || heroStageMotionQuery.matches || document.hidden;
+}
+
+function updateHeroStagePauseControl() {
+  if (!heroStageControls || !heroStageToggle) return;
+
+  const autoplayPaused = isHeroStageAutoplayPaused();
+  heroStageControls.dataset.paused = String(autoplayPaused);
+  heroStageCaption?.setAttribute("aria-live", autoplayPaused ? "polite" : "off");
+  heroStageToggle.hidden = heroStageMotionQuery.matches;
+  heroStageToggle.setAttribute("aria-pressed", String(heroStageUserPaused));
+  heroStageToggle.setAttribute("aria-label", heroStageUserPaused ? "继续轮播" : "暂停轮播");
+  const icon = heroStageToggle.querySelector<HTMLElement>("span");
+  if (icon) icon.textContent = heroStageUserPaused ? "▶" : "Ⅱ";
+}
+
+function scheduleHeroStageAutoplay() {
+  stopHeroStageAutoplay();
+  updateHeroStagePauseControl();
+  if (heroStagedArtifacts.length < 2 || isHeroStageAutoplayPaused()) return;
+
+  heroStageControls?.classList.remove("is-cycling");
+  void heroStageControls?.offsetWidth;
+  heroStageControls?.classList.add("is-cycling");
+  heroStageAutoplayTimer = window.setTimeout(() => {
+    if (document.body.dataset.route !== "home" || document.body.dataset.accessRole === "locked") {
+      scheduleHeroStageAutoplay();
+      return;
+    }
+    moveHeroStage(1);
+  }, HERO_STAGE_AUTOPLAY_DELAY);
+}
+
+function updateHeroStageCardPositions() {
+  if (!heroStageGallery) return;
+
+  const total = heroStagedArtifacts.length;
+  Array.from(heroStageGallery.querySelectorAll<HTMLButtonElement>(".stage-card")).forEach((card, index) => {
+    const position = (index - heroStageActiveIndex + total) % total;
+    const isFront = position === 0;
+    card.dataset.stagePosition = String(position);
+    card.classList.toggle("is-front", isFront);
+    card.tabIndex = isFront ? 0 : -1;
+    card.inert = !isFront;
+  });
+}
+
+function updateHeroStageCaption(animate = false) {
+  if (!heroStageCaption || heroStagedArtifacts.length === 0) return;
+  const artifact = heroStagedArtifacts[heroStageActiveIndex];
+  const applyCaption = () => {
+    heroStageCaption.innerHTML = `
+      <span>展厅 ${escapeHtml(String(heroStageActiveIndex + 1).padStart(2, "0"))}</span>
+      <strong>${escapeHtml(artifact.title)}</strong>
+      <small>${escapeHtml(artifact.categoryLabel)} · ${escapeHtml(artifact.year)}</small>
+    `;
+    if (heroStagePosition) {
+      heroStagePosition.textContent = `${String(heroStageActiveIndex + 1).padStart(2, "0")} / ${String(heroStagedArtifacts.length).padStart(2, "0")}`;
+      heroStagePosition.setAttribute(
+        "aria-label",
+        `第 ${heroStageActiveIndex + 1} 件，共 ${heroStagedArtifacts.length} 件`
+      );
+    }
+  };
+
+  window.clearTimeout(heroStageCaptionTimer);
+  if (!animate || heroStageMotionQuery.matches) {
+    heroStageCaption.classList.remove("is-changing");
+    applyCaption();
+    return;
+  }
+
+  heroStageCaption.classList.add("is-changing");
+  heroStageCaptionTimer = window.setTimeout(() => {
+    applyCaption();
+    requestAnimationFrame(() => heroStageCaption.classList.remove("is-changing"));
+  }, 210);
+}
+
+function moveHeroStage(direction: -1 | 1) {
+  if (heroStagedArtifacts.length < 2 || heroStageAnimating) return;
+
+  stopHeroStageAutoplay();
+  heroStageActiveIndex = (heroStageActiveIndex + direction + heroStagedArtifacts.length) % heroStagedArtifacts.length;
+  updateHeroStageCardPositions();
+  updateHeroStageCaption(true);
+
+  if (heroStageMotionQuery.matches) {
+    scheduleHeroStageAutoplay();
+    return;
+  }
+
+  heroStageAnimating = true;
+  heroStageGallery?.classList.add("is-transitioning");
+  window.clearTimeout(heroStageTransitionTimer);
+  heroStageTransitionTimer = window.setTimeout(() => {
+    heroStageAnimating = false;
+    heroStageGallery?.classList.remove("is-transitioning");
+    scheduleHeroStageAutoplay();
+  }, HERO_STAGE_TRANSITION_DURATION);
+}
+
 function renderHeroStage() {
   if (!heroStageGallery || !heroStageCaption) return;
 
-  const stagedArtifacts = allArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
-  if (stagedArtifacts.length === 0) return;
+  stopHeroStageAutoplay();
+  window.clearTimeout(heroStageCaptionTimer);
+  window.clearTimeout(heroStageTransitionTimer);
+  heroStageAnimating = false;
+  heroStageActiveIndex = 0;
+  heroStagedArtifacts = allArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
+  heroStageControls?.toggleAttribute("hidden", heroStagedArtifacts.length < 2);
+  if (heroStagedArtifacts.length === 0) return;
 
   heroStageGallery.replaceChildren(
-    ...stagedArtifacts.map((artifact, index) => {
+    ...heroStagedArtifacts.map((artifact, index) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `stage-card ${index === 0 ? "is-front" : ""}`;
+      button.className = "stage-card";
       button.setAttribute("aria-label", `打开 ${artifact.title} 的藏品详情`);
-      button.style.setProperty("--stage-index", String(index));
+      button.dataset.stagePosition = String(index);
       setCoverStyle(button, artifact);
       button.addEventListener("click", () => openArtifactDialog(artifact));
 
@@ -628,13 +760,9 @@ function renderHeroStage() {
       return button;
     })
   );
-
-  const lead = stagedArtifacts[0];
-  heroStageCaption.innerHTML = `
-    <span>展厅 ${escapeHtml(String(stagedArtifacts.length).padStart(2, "0"))}</span>
-    <strong>${escapeHtml(lead.title)}</strong>
-    <small>${escapeHtml(lead.categoryLabel)} · ${escapeHtml(lead.year)}</small>
-  `;
+  updateHeroStageCardPositions();
+  updateHeroStageCaption();
+  scheduleHeroStageAutoplay();
 }
 
 function renderCategoryIndex() {
@@ -1348,6 +1476,37 @@ function bindManagementEvents() {
   artifactFormReset?.addEventListener("click", () => resetArtifactForm());
 }
 
+function bindHeroStageEvents() {
+  heroStagePrevious?.addEventListener("click", () => moveHeroStage(-1));
+  heroStageNext?.addEventListener("click", () => moveHeroStage(1));
+  heroStageToggle?.addEventListener("click", () => {
+    heroStageUserPaused = !heroStageUserPaused;
+    scheduleHeroStageAutoplay();
+  });
+
+  heroStageHost?.addEventListener("pointerenter", () => {
+    heroStageInteractionPaused = true;
+    stopHeroStageAutoplay();
+    updateHeroStagePauseControl();
+  });
+  heroStageHost?.addEventListener("pointerleave", () => {
+    heroStageInteractionPaused = false;
+    scheduleHeroStageAutoplay();
+  });
+  heroStageHost?.addEventListener("focusin", () => {
+    heroStageInteractionPaused = true;
+    stopHeroStageAutoplay();
+    updateHeroStagePauseControl();
+  });
+  heroStageHost?.addEventListener("focusout", (event) => {
+    if (event.relatedTarget instanceof Node && heroStageHost.contains(event.relatedTarget)) return;
+    heroStageInteractionPaused = false;
+    scheduleHeroStageAutoplay();
+  });
+  document.addEventListener("visibilitychange", scheduleHeroStageAutoplay);
+  heroStageMotionQuery.addEventListener("change", scheduleHeroStageAutoplay);
+}
+
 function bindRouteEvents() {
   routeLinks.forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -1381,6 +1540,7 @@ function initMuseum() {
   renderAuthState();
   bindDialogEvents();
   bindManagementEvents();
+  bindHeroStageEvents();
   bindAuthEvents();
   bindRouteEvents();
   initMuseumMotion();

@@ -383,6 +383,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 [
   'id="hero-stage-gallery"',
   'id="hero-stage-caption"',
+  'id="hero-stage-controls"',
+  'id="hero-stage-toggle"',
   'id="category-index"'
 ].forEach((pattern) => {
   assert(html.includes(pattern), `Missing poster gallery markup: ${pattern}`);
@@ -462,6 +464,10 @@ assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migrati
 [
   "artifactNumber",
   "renderHeroStage",
+  "moveHeroStage",
+  "scheduleHeroStageAutoplay",
+  "bindHeroStageEvents",
+  "card.inert = !isFront",
   "renderCategoryIndex",
   "poster-card-topline",
   "category-ticket"
@@ -484,6 +490,9 @@ assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migrati
 [
   "hero-stage-card",
   "stage-rack",
+  "stage-carousel-controls",
+  "stage-carousel-meter",
+  'data-stage-position="0"',
   "category-index",
   "category-ticket",
   "poster-work",
