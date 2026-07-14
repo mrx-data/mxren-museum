@@ -29,6 +29,7 @@ import {
   refreshMuseumScrollAnimations
 } from "./museum-motion";
 import { initMuseumCanvas } from "./museum-canvas";
+import { artifactStoragePaths, validateImageFile } from "./artifact-images";
 
 type FilterId = "all" | ArtifactCategory;
 type MuseumRoute = "home" | "collection" | "manage";
@@ -58,10 +59,15 @@ let isCheckingAdminRole = false;
 let adminRoleError = "";
 let gateAdminFormOpen = false;
 let editingArtifactId: string | null = null;
+let isSavingArtifact = false;
 let pendingCoverImage = "";
 let pendingCoverFile: File | null = null;
+let pendingCoverStoragePath: string | undefined;
+let pendingCoverThumbnailImage: string | undefined;
+let pendingCoverThumbnailStoragePath: string | undefined;
 let pendingGalleryImages: GalleryImageInput[] = [];
 let pendingGalleryFiles: File[] = [];
+let pendingPreviewUrls: string[] = [];
 let activeRouteState: RouteState | null = null;
 let activeHash = "";
 let motionRefreshFrame = 0;
@@ -497,9 +503,10 @@ async function hydrateManagedArtifacts() {
   await refreshRemoteUser();
 }
 
-function appendCoverImage(cover: HTMLElement, artifact: Artifact) {
-  if (artifact.coverImage) {
-    cover.append(createImageElement(artifact.coverImage, artifact.coverAlt));
+function appendCoverImage(cover: HTMLElement, artifact: Artifact, useThumbnail = false) {
+  const source = useThumbnail ? artifact.coverThumbnailImage ?? artifact.coverImage : artifact.coverImage;
+  if (source) {
+    cover.append(createImageElement(source, artifact.coverAlt));
   }
 }
 
@@ -520,7 +527,7 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
   cover.setAttribute("role", "img");
   cover.setAttribute("aria-label", artifact.coverAlt);
   setCoverStyle(cover, artifact);
-  appendCoverImage(cover, artifact);
+  appendCoverImage(cover, artifact, true);
 
   const body = document.createElement("div");
   body.className = "artifact-body";
@@ -571,8 +578,9 @@ function renderHeroStage() {
       setCoverStyle(button, artifact);
       button.addEventListener("click", () => openArtifactDialog(artifact));
 
-      if (artifact.coverImage) {
-        button.append(createImageElement(artifact.coverImage, artifact.coverAlt, "eager", index === 0));
+      const source = artifact.coverThumbnailImage ?? artifact.coverImage;
+      if (source) {
+        button.append(createImageElement(source, artifact.coverAlt, "eager", index === 0));
       }
       return button;
     })
@@ -726,24 +734,16 @@ export function closeArtifactDialog() {
   });
 }
 
-export function readImageFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("Invalid image file"));
-      return;
-    }
+function releasePendingPreviewUrls() {
+  pendingPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  pendingPreviewUrls = [];
+}
 
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error("Invalid image result"));
-    });
-    reader.addEventListener("error", () => reject(new Error("Image read failed")));
-    reader.readAsDataURL(file);
-  });
+export function createImagePreviewUrl(file: File) {
+  validateImageFile(file);
+  const url = URL.createObjectURL(file);
+  pendingPreviewUrls.push(url);
+  return url;
 }
 
 function renderUploadPreviews() {
@@ -776,11 +776,14 @@ async function handleCoverUpload(event: Event) {
 
   try {
     pendingCoverFile = file;
-    pendingCoverImage = await readImageFileAsDataUrl(file);
+    pendingCoverStoragePath = undefined;
+    pendingCoverThumbnailImage = undefined;
+    pendingCoverThumbnailStoragePath = undefined;
+    pendingCoverImage = createImagePreviewUrl(file);
     renderUploadPreviews();
     showManagerStatus("封面已载入", "success");
-  } catch {
-    showManagerStatus("图片读取失败，请换一张图片", "danger");
+  } catch (error) {
+    showManagerStatus(error instanceof Error ? error.message : "图片读取失败，请换一张图片", "danger");
   }
 }
 
@@ -788,12 +791,18 @@ async function handleGalleryUpload(event: Event) {
   if (!requireManageAccess("上传详情图片")) return;
 
   const input = event.currentTarget as HTMLInputElement;
-  const files = Array.from(input.files ?? []).slice(0, 3);
+  const files = Array.from(input.files ?? []);
   if (files.length === 0) return;
+  if (files.length > 3) {
+    showManagerStatus("详情图片最多上传 3 张", "danger");
+    input.value = "";
+    return;
+  }
 
   try {
+    files.forEach(validateImageFile);
+    const sources = files.map((file) => createImagePreviewUrl(file));
     pendingGalleryFiles = files;
-    const sources = await Promise.all(files.map((file) => readImageFileAsDataUrl(file)));
     const title = artifactFormTitle?.value.trim() || "本地藏品";
     pendingGalleryImages = sources.map((src, index) => ({
       src,
@@ -802,8 +811,8 @@ async function handleGalleryUpload(event: Event) {
     }));
     renderUploadPreviews();
     showManagerStatus("详情图片已载入", "success");
-  } catch {
-    showManagerStatus("图片读取失败，请换一张图片", "danger");
+  } catch (error) {
+    showManagerStatus(error instanceof Error ? error.message : "图片读取失败，请换一张图片", "danger");
   }
 }
 
@@ -943,6 +952,9 @@ function artifactFormInput(): ArtifactFormInput | null {
     coverImage: pendingCoverImage,
     coverAlt: `${title} 的藏品封面`,
     coverFile: pendingCoverFile,
+    coverStoragePath: pendingCoverStoragePath,
+    coverThumbnailImage: pendingCoverThumbnailImage,
+    coverThumbnailStoragePath: pendingCoverThumbnailStoragePath,
     galleryImages: pendingGalleryImages,
     galleryFiles: pendingGalleryFiles,
     summary: artifactFormSummary?.value.trim() ?? "",
@@ -951,11 +963,15 @@ function artifactFormInput(): ArtifactFormInput | null {
 }
 
 function resetArtifactForm(updateStatus = true) {
+  releasePendingPreviewUrls();
   artifactForm?.reset();
   if (artifactFormId) artifactFormId.value = "";
   editingArtifactId = null;
   pendingCoverImage = "";
   pendingCoverFile = null;
+  pendingCoverStoragePath = undefined;
+  pendingCoverThumbnailImage = undefined;
+  pendingCoverThumbnailStoragePath = undefined;
   pendingGalleryImages = [];
   pendingGalleryFiles = [];
   if (artifactFormHeading) artifactFormHeading.textContent = "新增藏品";
@@ -969,13 +985,16 @@ function resetArtifactForm(updateStatus = true) {
 export async function handleArtifactSubmit(event: SubmitEvent) {
   event.preventDefault();
   if (!requireManageAccess("保存藏品")) return;
+  if (isSavingArtifact) return;
 
   const input = artifactFormInput();
   if (!input) return;
 
+  isSavingArtifact = true;
   try {
     const successMessage = editingArtifactId ? "藏品已更新" : "藏品已保存";
     if (persistenceMode === "supabase" && adminSession) {
+      showManagerStatus("正在优化并上传图片");
       if (editingArtifactId) {
         const managedArtifact = managedArtifacts.find((artifact) => artifact.id === editingArtifactId);
         if (managedArtifact) {
@@ -1007,6 +1026,8 @@ export async function handleArtifactSubmit(event: SubmitEvent) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
     showManagerStatus(`藏品未保存：${detail}`, "danger");
+  } finally {
+    isSavingArtifact = false;
   }
 }
 
@@ -1016,9 +1037,13 @@ export function handleArtifactEdit(id: string) {
   const artifact = allArtifacts().find((item) => item.id === id);
   if (!artifact) return;
 
+  releasePendingPreviewUrls();
   editingArtifactId = artifact.id;
   pendingCoverImage = artifact.coverImage;
   pendingCoverFile = null;
+  pendingCoverStoragePath = artifact.coverStoragePath;
+  pendingCoverThumbnailImage = artifact.coverThumbnailImage;
+  pendingCoverThumbnailStoragePath = artifact.coverThumbnailStoragePath;
   pendingGalleryImages = artifact.galleryImages.map((image) => ({ ...image }));
   pendingGalleryFiles = [];
 
@@ -1052,8 +1077,13 @@ export async function handleArtifactDelete(id: string) {
   if (!globalThis.confirm(confirmation)) return;
 
   try {
+    let cleanupWarning = "";
     if (artifact.source === "remote" && persistenceMode === "supabase") {
-      await deleteRemoteArtifact(artifact.remoteId ?? id, adminSession);
+      cleanupWarning = await deleteRemoteArtifact(
+        artifact.remoteId ?? id,
+        adminSession,
+        artifactStoragePaths(artifact)
+      );
       managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
     } else {
       showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
@@ -1061,7 +1091,10 @@ export async function handleArtifactDelete(id: string) {
     }
 
     if (editingArtifactId === id) resetArtifactForm();
-    showManagerStatus(restoresSample ? "已恢复内置版本" : "藏品已删除", "success");
+    showManagerStatus(
+      cleanupWarning || (restoresSample ? "已恢复内置版本" : "藏品已删除"),
+      cleanupWarning ? "danger" : "success"
+    );
     refreshMuseumView();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";

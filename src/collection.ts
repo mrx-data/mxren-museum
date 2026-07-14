@@ -13,6 +13,7 @@ export type Artifact = {
   symbol: string;
   coverAlt: string;
   coverImage: string;
+  coverThumbnailImage?: string;
   galleryImages: Array<{
     src: string;
     alt: string;
@@ -30,6 +31,7 @@ export type Artifact = {
   source?: "sample" | "local" | "remote";
   updatedAt?: string;
   coverStoragePath?: string;
+  coverThumbnailStoragePath?: string;
   remoteId?: string;
   sourceArtifactId?: string;
 };

@@ -3,6 +3,8 @@ dist/
 .playwright-cli/
 .DS_Store
 *.local
+artifact-image-backup-*
+supabase/.temp/
 .env
 .env.*
 !.env.example

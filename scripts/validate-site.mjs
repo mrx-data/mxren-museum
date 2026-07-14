@@ -40,6 +40,11 @@ function assert(condition, message) {
   "supabase/migrations/20260707010000_museum_admin_password_accounts.sql",
   "supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql",
   "supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql",
+  "supabase/migrations/20260713010000_artifact_storage_images.sql",
+  "supabase/functions/artifact-images/index.ts",
+  "supabase/config.toml",
+  "src/artifact-images.ts",
+  "scripts/migrate-artifact-images.mjs",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
   assert(exists(file), `Missing required file: ${file}`);
@@ -63,6 +68,9 @@ const supabaseRoleMigration = read("supabase/migrations/20260706010000_museum_ad
 const supabasePasswordMigration = read("supabase/migrations/20260707010000_museum_admin_password_accounts.sql");
 const supabaseOverrideMigration = read("supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql");
 const removeLegacySamplesMigration = read("supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql");
+const storageImagesMigration = read("supabase/migrations/20260713010000_artifact_storage_images.sql");
+const artifactImages = read("src/artifact-images.ts");
+const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
 ["dev", "preview", "lint", "typecheck", "build"].forEach((script) => {
@@ -352,7 +360,7 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   'id="artifact-manager-status"',
   "修改已经入馆的藏品",
   "全部馆藏",
-  'accept="image/*"',
+  'accept="image/jpeg,image/png,image/webp,image/gif"',
   "multiple"
 ].forEach((pattern) => {
   assert(html.includes(pattern), `Missing artifact management markup: ${pattern}`);
@@ -367,7 +375,7 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 });
 
 [
-  "readImageFileAsDataUrl",
+  "createImagePreviewUrl",
   "handleArtifactSubmit",
   "handleArtifactDelete",
   "handleArtifactEdit",
@@ -379,11 +387,24 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "createRemoteArtifact",
   "queryArtifacts",
   "loadLocalArtifacts",
-  "Promise.all(files.map",
-  ".slice(0, 3)"
+  "URL.createObjectURL",
+  "files.length > 3"
 ].forEach((pattern) => {
   assert(main.includes(pattern), `Missing artifact management script pattern: ${pattern}`);
 });
+
+[
+  "uploadToSignedUrl",
+  "createSignedUploadUrl",
+  "X-Museum-Session",
+  "cover_thumbnail_storage_path",
+  "Base64 cover images are no longer accepted"
+].forEach((pattern) => {
+  assert(`${artifactImages}\n${artifactStore}\n${storageFunction}\n${storageImagesMigration}`.includes(pattern), `Missing Storage image pattern: ${pattern}`);
+});
+
+assert(!main.includes("readAsDataURL"), "Managed image previews must not create Base64 data URLs");
+assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migration command");
 
 [
   "sourceArtifactId",

@@ -1,0 +1,4 @@
+project_id = "wjhktoqihszgdkxbanxu"
+
+[functions.artifact-images]
+verify_jwt = false

@@ -1,5 +1,11 @@
 import { categories, type Artifact, type ArtifactCategory } from "./collection";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase-client";
+import {
+  artifactStoragePaths,
+  deleteArtifactImages,
+  publicArtifactImageUrl,
+  uploadArtifactImage
+} from "./artifact-images";
 
 export const LOCAL_ARTIFACT_STORAGE_KEY = "mxren-museum.local-artifacts.v1";
 export const ADMIN_SESSION_STORAGE_KEY = "mxren-museum.admin-session.v1";
@@ -28,6 +34,8 @@ export type ArtifactFormInput = {
   coverAlt?: string;
   coverFile?: File | null;
   coverStoragePath?: string;
+  coverThumbnailImage?: string;
+  coverThumbnailStoragePath?: string;
   galleryImages: GalleryImageInput[];
   galleryFiles?: File[];
   summary: string;
@@ -74,6 +82,7 @@ type ArtifactRow = {
   cover_alt: string | null;
   cover_image: string | null;
   cover_storage_path: string | null;
+  cover_thumbnail_storage_path: string | null;
   gallery_images: unknown;
   palette: Artifact["palette"] | null;
   summary: string | null;
@@ -197,7 +206,7 @@ function normalizeGalleryImages(input: ArtifactFormInput, uploadedImages?: Galle
   }
 
   return input.galleryImages
-    .filter((image) => normalizeText(image.src).length > 0)
+    .filter((image) => normalizeText(image.src).length > 0 || normalizeText(image.storagePath ?? "").length > 0)
     .slice(0, 3)
     .map((image, index) => ({
       src: normalizeText(image.src),
@@ -215,6 +224,8 @@ function artifactFromInput(
   options: {
     coverImage?: string;
     coverStoragePath?: string;
+    coverThumbnailImage?: string;
+    coverThumbnailStoragePath?: string;
     galleryImages?: GalleryImageInput[];
     ownerId?: string;
     volume?: string;
@@ -242,6 +253,12 @@ function artifactFromInput(
     coverAlt: normalizeText(input.coverAlt ?? "") || `${title} 的藏品封面`,
     coverImage: normalizeText(options.coverImage ?? input.coverImage ?? ""),
     coverStoragePath: normalizeText(options.coverStoragePath ?? input.coverStoragePath ?? "") || undefined,
+    coverThumbnailImage:
+      normalizeText(options.coverThumbnailImage ?? input.coverThumbnailImage ?? "") ||
+      normalizeText(options.coverImage ?? input.coverImage ?? "") ||
+      undefined,
+    coverThumbnailStoragePath:
+      normalizeText(options.coverThumbnailStoragePath ?? input.coverThumbnailStoragePath ?? "") || undefined,
     galleryImages: normalizeGalleryImages(input, options.galleryImages),
     palette: options.palette ?? defaultPaletteByCategory[category],
     summary: normalizeText(input.summary),
@@ -260,18 +277,21 @@ function galleryFromUnknown(value: unknown, title: string): ArtifactGalleryImage
   return value
     .filter(isRecord)
     .slice(0, 3)
-    .map((image, index) => ({
-      src: typeof image.src === "string" ? image.src : "",
-      alt:
-        typeof image.alt === "string" && image.alt.trim()
-          ? image.alt
-          : `${title} 的详情图片 ${index + 1}`,
-      label:
-        typeof image.label === "string" && image.label.trim()
-          ? image.label
-          : defaultGalleryLabels[index] || `图 ${index + 1}`,
-      storagePath: typeof image.storagePath === "string" && image.storagePath.trim() ? image.storagePath : undefined
-    }))
+    .map((image, index) => {
+      const storagePath = typeof image.storagePath === "string" && image.storagePath.trim() ? image.storagePath : undefined;
+      return {
+        src: storagePath ? publicArtifactImageUrl(storagePath) : typeof image.src === "string" ? image.src : "",
+        alt:
+          typeof image.alt === "string" && image.alt.trim()
+            ? image.alt
+            : `${title} 的详情图片 ${index + 1}`,
+        label:
+          typeof image.label === "string" && image.label.trim()
+            ? image.label
+            : defaultGalleryLabels[index] || `图 ${index + 1}`,
+        storagePath
+      };
+    })
     .filter((image) => image.src.trim().length > 0);
 }
 
@@ -279,6 +299,10 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
   const category = isArtifactCategory(row.category) ? row.category : "personal-works";
   const title = row.title.trim() || "未命名藏品";
   const sourceArtifactId = row.source_artifact_id?.trim() || undefined;
+
+  const coverStoragePath = row.cover_storage_path?.trim() || undefined;
+  const coverThumbnailStoragePath = row.cover_thumbnail_storage_path?.trim() || undefined;
+  const coverImage = coverStoragePath ? publicArtifactImageUrl(coverStoragePath) : row.cover_image?.trim() || "";
 
   return {
     id: sourceArtifactId ?? row.id,
@@ -292,8 +316,10 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     featured: Boolean(row.featured),
     symbol: row.symbol?.trim() || symbolByCategory[category],
     coverAlt: row.cover_alt?.trim() || `${title} 的藏品封面`,
-    coverImage: row.cover_image?.trim() || "",
-    coverStoragePath: row.cover_storage_path?.trim() || undefined,
+    coverImage,
+    coverStoragePath,
+    coverThumbnailImage: coverThumbnailStoragePath ? publicArtifactImageUrl(coverThumbnailStoragePath) : coverImage,
+    coverThumbnailStoragePath,
     galleryImages: galleryFromUnknown(row.gallery_images, title),
     palette: row.palette ?? defaultPaletteByCategory[category],
     summary: row.summary?.trim() || "",
@@ -321,9 +347,15 @@ function rowFromArtifact(artifact: ManagedArtifact) {
     featured: artifact.featured,
     symbol: artifact.symbol,
     cover_alt: artifact.coverAlt,
-    cover_image: artifact.coverImage,
+    cover_image: artifact.coverStoragePath ? "" : artifact.coverImage,
     cover_storage_path: artifact.coverStoragePath ?? null,
-    gallery_images: artifact.galleryImages,
+    cover_thumbnail_storage_path: artifact.coverThumbnailStoragePath ?? null,
+    gallery_images: artifact.galleryImages.map((image) => ({
+      src: image.storagePath ? "" : image.src,
+      alt: image.alt,
+      label: image.label,
+      storagePath: image.storagePath
+    })),
     palette: artifact.palette,
     summary: artifact.summary,
     note: artifact.note
@@ -419,7 +451,9 @@ export async function loadRemoteArtifacts(): Promise<ManagedArtifact[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("artifacts")
-    .select("*")
+    .select(
+      "id,source_artifact_id,owner_id,title,category,category_label,volume,year,medium,rarity,featured,symbol,cover_alt,cover_image,cover_storage_path,cover_thumbnail_storage_path,gallery_images,palette,summary,note,updated_at"
+    )
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -503,6 +537,64 @@ export function onRemoteAuthChange(_callback: (session: AdminSession | null) => 
   return () => undefined;
 }
 
+async function uploadInputImages(
+  artifactId: string,
+  input: ArtifactFormInput,
+  session: AdminSession
+): Promise<{
+  coverImage: string;
+  coverStoragePath?: string;
+  coverThumbnailImage?: string;
+  coverThumbnailStoragePath?: string;
+  galleryImages: GalleryImageInput[];
+  uploadedPaths: string[];
+}> {
+  const uploadedPaths: string[] = [];
+  let coverImage = input.coverImage ?? "";
+  let coverStoragePath = input.coverStoragePath;
+  let coverThumbnailImage = input.coverThumbnailImage;
+  let coverThumbnailStoragePath = input.coverThumbnailStoragePath;
+  let galleryImages = input.galleryImages;
+
+  try {
+    if (input.coverFile) {
+      const uploadedCover = await uploadArtifactImage(artifactId, input.coverFile, session.token, true);
+      uploadedPaths.push(...uploadedCover.uploadedPaths);
+      coverImage = uploadedCover.displayUrl;
+      coverStoragePath = uploadedCover.displayPath;
+      coverThumbnailImage = uploadedCover.thumbnailUrl ?? uploadedCover.displayUrl;
+      coverThumbnailStoragePath = uploadedCover.thumbnailPath;
+    }
+
+    if (input.galleryFiles?.length) {
+      galleryImages = [];
+      for (const [index, file] of input.galleryFiles.slice(0, 3).entries()) {
+        const uploadedImage = await uploadArtifactImage(artifactId, file, session.token, false);
+        uploadedPaths.push(...uploadedImage.uploadedPaths);
+        const metadata = input.galleryImages[index];
+        galleryImages.push({
+          src: uploadedImage.displayUrl,
+          storagePath: uploadedImage.displayPath,
+          alt: metadata?.alt,
+          label: metadata?.label
+        });
+      }
+    }
+  } catch (error) {
+    await deleteArtifactImages(artifactId, uploadedPaths, session.token).catch(() => undefined);
+    throw error;
+  }
+
+  return {
+    coverImage,
+    coverStoragePath,
+    coverThumbnailImage,
+    coverThumbnailStoragePath,
+    galleryImages,
+    uploadedPaths
+  };
+}
+
 export async function createRemoteArtifact(
   input: ArtifactFormInput,
   existing: Artifact[],
@@ -526,8 +618,13 @@ export async function createRemoteArtifact(
   }
   const databaseId = remoteId();
   const displayId = options.sourceArtifactId ?? input.id ?? databaseId;
+  const uploaded = await uploadInputImages(databaseId, input, session);
   const artifact = artifactFromInput(input, existing, displayId, "remote", {
-    galleryImages: normalizeGalleryImages(input),
+    coverImage: uploaded.coverImage,
+    coverStoragePath: uploaded.coverStoragePath,
+    coverThumbnailImage: uploaded.coverThumbnailImage,
+    coverThumbnailStoragePath: uploaded.coverThumbnailStoragePath,
+    galleryImages: uploaded.galleryImages,
     remoteId: databaseId,
     sourceArtifactId: options.sourceArtifactId,
     volume: options.volume,
@@ -535,13 +632,18 @@ export async function createRemoteArtifact(
     symbol: options.symbol
   });
 
-  const { data, error } = await supabase.rpc("create_museum_artifact", {
-    input_session_token: session.token,
-    artifact_row: rowFromArtifact(artifact)
-  });
+  try {
+    const { data, error } = await supabase.rpc("create_museum_artifact", {
+      input_session_token: session.token,
+      artifact_row: rowFromArtifact(artifact)
+    });
 
-  if (error) throw new Error(error.message);
-  return artifactFromRow(data as ArtifactRow);
+    if (error) throw new Error(error.message);
+    return artifactFromRow(data as ArtifactRow);
+  } catch (error) {
+    await deleteArtifactImages(databaseId, uploaded.uploadedPaths, session.token).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function updateRemoteArtifact(
@@ -552,32 +654,56 @@ export async function updateRemoteArtifact(
 ): Promise<ManagedArtifact> {
   const supabase = getSupabaseClient();
   const current = existing.find((artifact) => artifact.id === id);
+  const databaseId = current?.remoteId ?? id;
+  const uploaded = await uploadInputImages(databaseId, input, session);
   const artifact = artifactFromInput(input, existing, id, "remote", {
-    galleryImages: normalizeGalleryImages(input),
+    coverImage: uploaded.coverImage,
+    coverStoragePath: uploaded.coverStoragePath,
+    coverThumbnailImage: uploaded.coverThumbnailImage,
+    coverThumbnailStoragePath: uploaded.coverThumbnailStoragePath,
+    galleryImages: uploaded.galleryImages,
     volume: current?.volume,
-    remoteId: current?.remoteId ?? id,
+    remoteId: databaseId,
     sourceArtifactId: current?.sourceArtifactId,
     palette: current?.palette,
     symbol: current?.symbol
   });
 
-  const { data, error } = await supabase.rpc("update_museum_artifact", {
-    input_session_token: session.token,
-    artifact_id: current?.remoteId ?? id,
-    artifact_row: rowFromArtifact(artifact)
-  });
+  try {
+    const { data, error } = await supabase.rpc("update_museum_artifact", {
+      input_session_token: session.token,
+      artifact_id: databaseId,
+      artifact_row: rowFromArtifact(artifact)
+    });
 
-  if (error) throw new Error(error.message);
-  return artifactFromRow(data as ArtifactRow);
+    if (error) throw new Error(error.message);
+    const updated = artifactFromRow(data as ArtifactRow);
+    const retainedPaths = new Set(artifactStoragePaths(updated));
+    const replacedPaths = current ? artifactStoragePaths(current).filter((path) => !retainedPaths.has(path)) : [];
+    await deleteArtifactImages(databaseId, replacedPaths, session.token).catch((cleanupError) => {
+      console.warn("Artifact saved, but replaced images could not be removed", cleanupError);
+    });
+    return updated;
+  } catch (error) {
+    await deleteArtifactImages(databaseId, uploaded.uploadedPaths, session.token).catch(() => undefined);
+    throw error;
+  }
 }
 
-export async function deleteRemoteArtifact(id: string, session: AdminSession) {
+export async function deleteRemoteArtifact(id: string, session: AdminSession, storagePaths: string[] = []) {
   const supabase = getSupabaseClient();
   const { error } = await supabase.rpc("delete_museum_artifact", {
     input_session_token: session.token,
     artifact_id: id
   });
   if (error) throw new Error(error.message);
+  try {
+    await deleteArtifactImages(id, storagePaths, session.token);
+    return "";
+  } catch (cleanupError) {
+    console.warn("Artifact deleted, but its images could not be removed", cleanupError);
+    return "藏品已删除，但旧图片清理失败，可稍后重试";
+  }
 }
 
 export function queryArtifacts(

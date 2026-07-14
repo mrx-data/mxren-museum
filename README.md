@@ -11,6 +11,7 @@ npm run lint
 npm run typecheck
 npm run build
 npm run preview
+npm run migrate:artifact-images -- --dry-run
 ```
 
 ## Current Scope
@@ -18,7 +19,7 @@ npm run preview
 - Static Vite + TypeScript frontend.
 - One bundled artifact in `src/collection.ts`: `黑神话：悟空`.
 - The user-provided `public/artifacts/blackMyth.png`, wired into its cover and detail gallery.
-- Supabase-backed artifact management for creating, querying, editing, deleting, and uploading cover/detail images through Postgres RPC.
+- Supabase-backed artifact management with Postgres metadata and CDN-served images in the public `artifact-images` Storage bucket.
 - Built-in artifacts can be edited through cloud override rows keyed by `source_artifact_id`; the original TypeScript entries remain as recoverable defaults and are not duplicated in the gallery.
 - Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
 - Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
@@ -30,7 +31,7 @@ npm run preview
 
 ## Supabase Persistence
 
-The app uses `@supabase/supabase-js` from the browser with a publishable key. Public reads are allowed by RLS; writes are routed through SECURITY DEFINER RPC functions and require a short-lived admin session token. Admin usernames and encrypted password hashes live in `public.museum_admin_accounts`; the frontend never reads password hashes.
+The app uses `@supabase/supabase-js` from the browser with a publishable key. Public metadata and Storage images are readable; metadata writes use SECURITY DEFINER RPC functions. Image writes use short-lived signed upload URLs issued by the `artifact-images` Edge Function after it verifies the same custom admin session.
 
 Environment variables:
 
@@ -39,7 +40,7 @@ VITE_SUPABASE_URL=https://wjhktoqihszgdkxbanxu.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-The publishable key is safe to expose in a static frontend, but database access must be protected by Row Level Security. Never put a Supabase secret key or legacy `service_role` key in this project.
+The publishable key is safe to expose in a static frontend. A Service Role key is used only as an Edge Function runtime secret and as a local environment variable for the migration script; it must never enter the browser bundle, committed files, command output, or documentation.
 
 One-time Supabase setup:
 
@@ -48,7 +49,9 @@ One-time Supabase setup:
 3. Run `supabase/migrations/20260707010000_museum_admin_password_accounts.sql`.
 4. Run `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql`.
 5. Run `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql`.
-6. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+6. Run `supabase/migrations/20260713010000_artifact_storage_images.sql`.
+7. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
+8. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 
@@ -69,7 +72,7 @@ Do not store a filled admin password, `sb_secret_...`, or legacy `service_role` 
 
 ## Browser-Local Management
 
-The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. In the custom admin flow, uploaded images are stored in `public.artifacts` as data URLs alongside artifact rows.
+The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. Image previews use temporary object URLs; uploads are optimized to WebP where appropriate and sent directly to Supabase Storage. Postgres stores paths and text metadata, not new Base64 payloads.
 
 If Supabase is not configured or the remote schema is unavailable, the app falls back to reading browser-local managed artifacts. This fallback is limited to the current browser profile and does not sync across devices, users, or browsers. New writes stay disabled until admin access can be verified through Supabase.
 
@@ -89,6 +92,7 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `src/collection.ts` | Shared artifact types and the single bundled `黑神话：悟空` artifact |
 | `src/supabase-client.ts` | Supabase client and publishable-key configuration |
 | `src/artifact-store.ts` | Supabase artifact query, admin-login RPC helpers, artifact CRUD RPC, and browser-local fallback |
+| `src/artifact-images.ts` | Browser image validation, WebP variants, signed uploads, public URLs, and cleanup |
 | `src/main.ts` | Entry gate, access state, rendering, filters, counts, management behavior, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
 | `src/museum-canvas.ts` | Responsive, reduced-motion-aware archive-dust Canvas background |
@@ -96,6 +100,8 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `public/artifacts/` | User-provided `blackMyth.png` used by the remaining bundled artifact |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
 | `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, built-in artifact overrides, and Storage compatibility policies |
+| `supabase/functions/artifact-images/` | Custom-session verification and signed Storage upload/delete operations |
+| `scripts/migrate-artifact-images.mjs` | Dry-run, migration, verification, and Base64 cleanup utility |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
 | `.github/workflows/deploy-pages.yml` | GitHub Pages deployment workflow |
 | `docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md` | Design spec |
