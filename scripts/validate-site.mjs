@@ -42,6 +42,7 @@ function assert(condition, message) {
   "supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql",
   "supabase/migrations/20260713010000_artifact_storage_images.sql",
   "supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql",
+  "supabase/migrations/20260714020000_museum_categories.sql",
   "supabase/functions/artifact-images/index.ts",
   "supabase/config.toml",
   "src/artifact-images.ts",
@@ -71,6 +72,7 @@ const supabaseOverrideMigration = read("supabase/migrations/20260710020000_museu
 const removeLegacySamplesMigration = read("supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql");
 const storageImagesMigration = read("supabase/migrations/20260713010000_artifact_storage_images.sql");
 const jpegStorageMigration = read("supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql");
+const museumCategoriesMigration = read("supabase/migrations/20260714020000_museum_categories.sql");
 const artifactImages = read("src/artifact-images.ts");
 const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
@@ -372,6 +374,10 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   'id="artifact-gallery-upload"',
   'id="artifact-manager-list"',
   'id="artifact-manager-status"',
+  'id="artifact-category-edit"',
+  'id="artifact-category-editor"',
+  'id="artifact-category-save"',
+  "＋ 新增类别…",
   "修改已经入馆的藏品",
   "全部馆藏",
   'accept="image/jpeg,image/png,image/webp,image/gif"',
@@ -383,11 +389,18 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
 [
   'id="hero-stage-gallery"',
   'id="hero-stage-caption"',
-  'id="hero-stage-controls"',
-  'id="hero-stage-toggle"',
   'id="category-index"'
 ].forEach((pattern) => {
   assert(html.includes(pattern), `Missing poster gallery markup: ${pattern}`);
+});
+
+[
+  'id="hero-stage-controls"',
+  'id="hero-stage-previous"',
+  'id="hero-stage-next"',
+  'id="hero-stage-toggle"'
+].forEach((pattern) => {
+  assert(!html.includes(pattern), `Manual hero carousel control should be removed: ${pattern}`);
 });
 
 [
@@ -397,6 +410,8 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "showArtifactSaveError",
   "handleArtifactDelete",
   "handleArtifactEdit",
+  "handleCategorySave",
+  "renderArtifactCategoryOptions",
   "mergeArtifacts",
   "handleGateGuestAccess",
   "handleGateAdminSubmit",
@@ -409,6 +424,21 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "files.length > 3"
 ].forEach((pattern) => {
   assert(main.includes(pattern), `Missing artifact management script pattern: ${pattern}`);
+});
+
+[
+  "create table if not exists public.museum_categories",
+  "drop constraint if exists artifacts_category_check",
+  "create or replace function public.save_museum_category",
+  "perform public.assert_museum_admin_session",
+  "update public.artifacts",
+  "museum_categories_label_unique"
+].forEach((pattern) => {
+  assert(museumCategoriesMigration.includes(pattern), `Missing museum category migration pattern: ${pattern}`);
+});
+
+["loadArtifactCategories", "saveRemoteArtifactCategory", "save_museum_category"].forEach((pattern) => {
+  assert(artifactStore.includes(pattern), `Missing dynamic category store pattern: ${pattern}`);
 });
 
 [
@@ -490,8 +520,6 @@ assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migrati
 [
   "hero-stage-card",
   "stage-rack",
-  "stage-carousel-controls",
-  "stage-carousel-meter",
   'data-stage-position="0"',
   "category-index",
   "category-ticket",
@@ -499,6 +527,10 @@ assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migrati
   "poster-specs"
 ].forEach((pattern) => {
   assert(css.includes(pattern), `Missing poster gallery styling: ${pattern}`);
+});
+
+["stage-carousel-controls", "stage-carousel-position", "stage-carousel-meter"].forEach((pattern) => {
+  assert(!css.includes(pattern), `Manual hero carousel styling should be removed: ${pattern}`);
 });
 
 assert(readme.includes("browser-local"), "README must document browser-local management storage");

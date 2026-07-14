@@ -1,11 +1,12 @@
 # Supabase Persistence Runbook
 
-Production status (2026-07-14): migrations through `20260714010000_allow_jpeg_storage_variants.sql` are applied and the `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
+Production status (2026-07-14): migrations through `20260714020000_museum_categories.sql` are applied and the `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
 
 mxren-museum remains a static GitHub Pages site. Supabase provides the runtime persistence layer for managed artifacts and custom admin login:
 
 - Auth: the full site is hidden behind an entry gate; visitors enter with one click, while admins sign in with a username/password stored in `public.museum_admin_accounts`.
 - Postgres: `public.artifacts` stores artifact metadata.
+- Categories: `public.museum_categories` is publicly readable; admins add or rename categories through `save_museum_category`, which also updates existing artifact labels.
 - Storage: the public `artifact-images` bucket stores immutable cover and gallery objects; the database stores their paths.
 - Edge Function: `artifact-images` verifies the custom museum session before issuing signed upload URLs or deleting owned paths.
 - Built-in overrides: `source_artifact_id` links a cloud row to a TypeScript sample artifact, allowing edits without duplicate gallery cards; deleting the override restores the built-in version.
@@ -25,8 +26,9 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 6. Run `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql`.
 7. Run `supabase/migrations/20260713010000_artifact_storage_images.sql`.
 8. Run `supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql`.
-9. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
-10. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
+9. Run `supabase/migrations/20260714020000_museum_categories.sql`.
+10. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
+11. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
 set search_path = public, extensions;
@@ -41,7 +43,7 @@ set
   updated_at = now();
 ```
 
-11. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, edit `黑神话：悟空`, and create a test artifact.
+12. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, add or rename a category, edit `黑神话：悟空`, and create a test artifact.
 
 ## Environment
 
@@ -84,6 +86,7 @@ npm run migrate:artifact-images -- --cleanup --backup-confirmed
 - Auth check: invalid username/password returns to the entry gate and exposes no management controls.
 - Session check: deleting or expiring a row in `public.museum_admin_sessions` makes the stored browser admin session read-only again.
 - Admin check: valid credentials can create, edit, delete, request signed uploads, and clean replaced objects; Postgres rows contain Storage paths rather than data URLs.
+- Category check: the management select can add a category and rename the selected category; filters, counts, existing artifact labels, and refresh persistence stay in sync.
 - Compatibility check: if Canvas cannot encode WebP, cover and gallery processing falls back to JPEG and stores `.jpg` paths accepted by the Bucket, Edge Function, and database validator.
 - Built-in edit check: editing a sample artifact creates one row whose `source_artifact_id` matches the sample ID; the gallery keeps one card, and `恢复内置` deletes the override and restores the original content.
 
@@ -98,3 +101,4 @@ npm run migrate:artifact-images -- --cleanup --backup-confirmed
 - Expired admin session: the app clears the stored session and returns to guest read-only mode.
 - GitHub Pages deployment does not need a server change; the browser bundle talks to Supabase directly.
 - Missing Edge Function or Storage migration: metadata remains readable, but new image uploads fail without storing a partial artifact row.
+- Missing category migration: built-in categories remain readable as a frontend fallback, but adding or renaming a category fails safely without changing artifact data.

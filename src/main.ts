@@ -1,5 +1,5 @@
 import "./styles.css";
-import { artifacts as sampleArtifacts, categories, type Artifact, type ArtifactCategory } from "./collection";
+import { artifacts as sampleArtifacts, categories as defaultCategories, type Artifact, type ArtifactCategory } from "./collection";
 import {
   clearStoredAdminSession,
   createRemoteArtifact,
@@ -7,13 +7,16 @@ import {
   getRemoteUser,
   isRemoteAdmin,
   isSupabaseConfigured,
+  loadArtifactCategories,
   loadManagedArtifacts,
   loadLocalArtifacts,
   onRemoteAuthChange,
   queryArtifacts,
   signInRemoteUser,
   signOutRemoteUser,
+  saveRemoteArtifactCategory,
   updateRemoteArtifact,
+  type ArtifactCategoryDefinition,
   type ArtifactFormInput,
   type GalleryImageInput,
   type ManagedArtifact,
@@ -47,11 +50,13 @@ const routeTitles: Record<MuseumRoute, string> = {
 };
 
 const ACCESS_MODE_STORAGE_KEY = "mxren-museum.access-mode.v1";
+const NEW_CATEGORY_VALUE = "__new_category__";
 
 let activeFilter: FilterId = "all";
 let searchQuery = "";
 let dialogClosing = false;
 let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
+let artifactCategories: Array<{ id: FilterId; label: string }> = defaultCategories.map((category) => ({ ...category }));
 let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
 let adminSession: Awaited<ReturnType<typeof getRemoteUser>> = null;
 let accessRole: AccessRole = loadStoredAccessRole();
@@ -60,6 +65,9 @@ let adminRoleError = "";
 let gateAdminFormOpen = false;
 let editingArtifactId: string | null = null;
 let isSavingArtifact = false;
+let isSavingCategory = false;
+let editingCategoryId: ArtifactCategory | null = null;
+let categorySelectionBeforeCreate: ArtifactCategory = "games";
 let pendingCoverImage = "";
 let pendingCoverFile: File | null = null;
 let pendingCoverStoragePath: string | undefined;
@@ -82,7 +90,6 @@ let heroStageAutoplayTimer = 0;
 let heroStageCaptionTimer = 0;
 let heroStageTransitionTimer = 0;
 let heroStageAnimating = false;
-let heroStageUserPaused = false;
 let heroStageInteractionPaused = false;
 const heroStageMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const HERO_STAGE_AUTOPLAY_DELAY = 6800;
@@ -102,11 +109,6 @@ const categoryCount = document.querySelector<HTMLElement>("#category-count");
 const heroStageGallery = document.querySelector<HTMLElement>("#hero-stage-gallery");
 const heroStageCaption = document.querySelector<HTMLElement>("#hero-stage-caption");
 const heroStageHost = heroStageGallery?.closest<HTMLElement>(".hero-stage-card") ?? null;
-const heroStageControls = document.querySelector<HTMLElement>("#hero-stage-controls");
-const heroStagePrevious = document.querySelector<HTMLButtonElement>("#hero-stage-previous");
-const heroStageNext = document.querySelector<HTMLButtonElement>("#hero-stage-next");
-const heroStageToggle = document.querySelector<HTMLButtonElement>("#hero-stage-toggle");
-const heroStagePosition = document.querySelector<HTMLElement>("#hero-stage-position");
 const featuredGallery = document.querySelector<HTMLElement>("#featured-gallery");
 const categoryIndex = document.querySelector<HTMLElement>("#category-index");
 const filterBar = document.querySelector<HTMLElement>("#filter-bar");
@@ -127,6 +129,11 @@ const artifactFormHeading = document.querySelector<HTMLElement>("#artifact-form-
 const artifactFormId = document.querySelector<HTMLInputElement>("#artifact-form-id");
 const artifactFormTitle = document.querySelector<HTMLInputElement>("#artifact-form-title");
 const artifactFormCategory = document.querySelector<HTMLSelectElement>("#artifact-form-category");
+const artifactCategoryEdit = document.querySelector<HTMLButtonElement>("#artifact-category-edit");
+const artifactCategoryEditor = document.querySelector<HTMLElement>("#artifact-category-editor");
+const artifactCategoryName = document.querySelector<HTMLInputElement>("#artifact-category-name");
+const artifactCategorySave = document.querySelector<HTMLButtonElement>("#artifact-category-save");
+const artifactCategoryCancel = document.querySelector<HTMLButtonElement>("#artifact-category-cancel");
 const artifactFormYear = document.querySelector<HTMLInputElement>("#artifact-form-year");
 const artifactFormMedium = document.querySelector<HTMLInputElement>("#artifact-form-medium");
 const artifactFormRarity = document.querySelector<HTMLInputElement>("#artifact-form-rarity");
@@ -143,6 +150,7 @@ const artifactManagerStatus = document.querySelector<HTMLElement>("#artifact-man
 const artifactSaveButton = document.querySelector<HTMLButtonElement>("#artifact-save-button");
 const artifactFormReset = document.querySelector<HTMLButtonElement>("#artifact-form-reset");
 const artifactSaveError = document.querySelector<HTMLDialogElement>("#artifact-save-error");
+const artifactSaveErrorTitle = document.querySelector<HTMLElement>("#save-error-title");
 const artifactSaveErrorMessage = document.querySelector<HTMLElement>("#save-error-message");
 const artifactSaveErrorClose = document.querySelector<HTMLButtonElement>(".save-error-close");
 const artifactSaveErrorConfirm = document.querySelector<HTMLButtonElement>("#save-error-confirm");
@@ -212,7 +220,7 @@ function resolveAssetSrc(src: string) {
 }
 
 function isArtifactCategory(value: string): value is ArtifactCategory {
-  return value === "games" || value === "landscapes" || value === "personal-works";
+  return artifactCategories.some((category) => category.id !== "all" && category.id === value);
 }
 
 function routeFromHash(hash = window.location.hash): RouteState {
@@ -333,7 +341,27 @@ export function mergeArtifacts(samples: Artifact[], managed: ManagedArtifact[]) 
 }
 
 function allArtifacts() {
-  return mergeArtifacts(sampleArtifacts, managedArtifacts);
+  const categoryLabels = new Map(artifactCategories.map((category) => [category.id, category.label]));
+  return mergeArtifacts(sampleArtifacts, managedArtifacts).map((artifact) => {
+    const currentLabel = categoryLabels.get(artifact.category);
+    return currentLabel && currentLabel !== artifact.categoryLabel
+      ? { ...artifact, categoryLabel: currentLabel }
+      : artifact;
+  });
+}
+
+function mergeArtifactCategories(definitions: ArtifactCategoryDefinition[], artifacts: Artifact[]) {
+  const categoriesById = new Map<ArtifactCategory, ArtifactCategoryDefinition>();
+  definitions.forEach((category) => categoriesById.set(category.id, category));
+  artifacts.forEach((artifact) => {
+    if (!categoriesById.has(artifact.category)) {
+      categoriesById.set(artifact.category, { id: artifact.category, label: artifact.categoryLabel });
+    }
+  });
+  artifactCategories = [
+    { id: "all", label: "全部馆藏" },
+    ...Array.from(categoriesById.values())
+  ];
 }
 
 function artifactNumber(index: number) {
@@ -404,8 +432,13 @@ function setManagementControlsDisabled() {
       "input, select, textarea, button"
     )
     .forEach((control) => {
-      control.disabled = !canManage || isSavingArtifact;
+      control.disabled = !canManage || isSavingArtifact || isSavingCategory;
     });
+
+  if (artifactCategoryEdit) {
+    artifactCategoryEdit.disabled =
+      !canManage || isSavingArtifact || isSavingCategory || !isArtifactCategory(artifactFormCategory?.value ?? "");
+  }
 }
 
 function setArtifactSavingState(saving: boolean) {
@@ -421,9 +454,10 @@ function setArtifactSavingState(saving: boolean) {
   setManagementControlsDisabled();
 }
 
-function showArtifactSaveError(detail: string) {
+function showArtifactSaveError(detail: string, title = "藏品未保存") {
   if (!artifactSaveError || !artifactSaveErrorMessage) return;
 
+  if (artifactSaveErrorTitle) artifactSaveErrorTitle.textContent = title;
   artifactSaveErrorMessage.textContent = detail;
   if (!artifactSaveError.open) artifactSaveError.showModal();
   artifactSaveErrorConfirm?.focus();
@@ -434,6 +468,98 @@ function closeArtifactSaveError() {
 
   artifactSaveError.close();
   artifactSaveButton?.focus({ preventScroll: true });
+}
+
+function renderArtifactCategoryOptions(selectedCategory = artifactFormCategory?.value ?? categorySelectionBeforeCreate) {
+  if (!artifactFormCategory) return;
+
+  const options = artifactCategories
+    .filter((category) => category.id !== "all")
+    .map((category) => new Option(category.label, category.id));
+  options.push(new Option("＋ 新增类别…", NEW_CATEGORY_VALUE));
+  artifactFormCategory.replaceChildren(...options);
+
+  if (isArtifactCategory(selectedCategory)) {
+    artifactFormCategory.value = selectedCategory;
+    categorySelectionBeforeCreate = selectedCategory;
+  } else {
+    artifactFormCategory.value = NEW_CATEGORY_VALUE;
+  }
+  setManagementControlsDisabled();
+}
+
+function closeCategoryEditor(restorePreviousSelection = false) {
+  if (artifactCategoryEditor) artifactCategoryEditor.hidden = true;
+  if (artifactCategoryName) artifactCategoryName.value = "";
+  editingCategoryId = null;
+  if (restorePreviousSelection) renderArtifactCategoryOptions(categorySelectionBeforeCreate);
+}
+
+function openCategoryEditor(categoryId: ArtifactCategory | null) {
+  if (!artifactCategoryEditor || !artifactCategoryName) return;
+
+  editingCategoryId = categoryId;
+  const category = artifactCategories.find((item) => item.id === categoryId);
+  artifactCategoryName.value = category?.label ?? "";
+  if (artifactCategorySave) artifactCategorySave.textContent = categoryId ? "保存修改" : "新增类别";
+  artifactCategoryEditor.hidden = false;
+  artifactCategoryName.focus();
+}
+
+function setCategorySavingState(saving: boolean) {
+  isSavingCategory = saving;
+  artifactCategoryEditor?.setAttribute("aria-busy", String(saving));
+  if (artifactCategorySave) artifactCategorySave.textContent = saving ? "正在保存" : editingCategoryId ? "保存修改" : "新增类别";
+  setManagementControlsDisabled();
+}
+
+async function handleCategorySave() {
+  if (!requireManageAccess("保存类别") || !adminSession || isSavingCategory) return;
+
+  const label = artifactCategoryName?.value.trim() ?? "";
+  if (!label || label.length > 40) {
+    showManagerStatus("类别名称需为 1 至 40 个字符", "danger");
+    artifactCategoryName?.focus();
+    return;
+  }
+
+  const duplicate = artifactCategories.find(
+    (category) => category.id !== editingCategoryId && category.label.toLocaleLowerCase() === label.toLocaleLowerCase()
+  );
+  if (duplicate) {
+    showManagerStatus("已存在同名类别", "danger");
+    artifactCategoryName?.focus();
+    return;
+  }
+
+  const generatedId = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const categoryId = editingCategoryId ?? `custom-${generatedId}`;
+  const wasEditing = Boolean(editingCategoryId);
+
+  setCategorySavingState(true);
+  try {
+    const savedCategory = await saveRemoteArtifactCategory(categoryId, label, adminSession);
+    const existingIndex = artifactCategories.findIndex((category) => category.id === savedCategory.id);
+    if (existingIndex >= 0) {
+      artifactCategories[existingIndex] = savedCategory;
+    } else {
+      artifactCategories.push(savedCategory);
+    }
+    managedArtifacts = managedArtifacts.map((artifact) =>
+      artifact.category === savedCategory.id ? { ...artifact, categoryLabel: savedCategory.label } : artifact
+    );
+    categorySelectionBeforeCreate = savedCategory.id;
+    closeCategoryEditor();
+    renderArtifactCategoryOptions(savedCategory.id);
+    refreshMuseumView();
+    showManagerStatus(wasEditing ? "类别已更新" : "类别已新增", "success");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "未知错误";
+    showManagerStatus(`类别未保存：${detail}`, "danger");
+    showArtifactSaveError(detail, "类别未保存");
+  } finally {
+    setCategorySavingState(false);
+  }
 }
 
 function renderAuthState(updateManagerStatus = true) {
@@ -555,9 +681,11 @@ async function refreshRemoteUser() {
 
 async function hydrateManagedArtifacts() {
   showManagerStatus(isSupabaseConfigured() ? "正在连接 Supabase" : "browser-local storage");
-  const result = await loadManagedArtifacts();
+  const [result, loadedCategories] = await Promise.all([loadManagedArtifacts(), loadArtifactCategories()]);
   persistenceMode = result.mode;
   managedArtifacts = result.artifacts;
+  mergeArtifactCategories(loadedCategories, mergeArtifacts(sampleArtifacts, managedArtifacts));
+  renderArtifactCategoryOptions();
   showManagerStatus(result.message, result.error ? "danger" : result.mode === "supabase" ? "success" : "neutral");
   refreshMuseumView();
   await refreshRemoteUser();
@@ -625,34 +753,18 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
 function stopHeroStageAutoplay() {
   window.clearTimeout(heroStageAutoplayTimer);
   heroStageAutoplayTimer = 0;
-  heroStageControls?.classList.remove("is-cycling");
 }
 
 function isHeroStageAutoplayPaused() {
-  return heroStageUserPaused || heroStageInteractionPaused || heroStageMotionQuery.matches || document.hidden;
-}
-
-function updateHeroStagePauseControl() {
-  if (!heroStageControls || !heroStageToggle) return;
-
-  const autoplayPaused = isHeroStageAutoplayPaused();
-  heroStageControls.dataset.paused = String(autoplayPaused);
-  heroStageCaption?.setAttribute("aria-live", autoplayPaused ? "polite" : "off");
-  heroStageToggle.hidden = heroStageMotionQuery.matches;
-  heroStageToggle.setAttribute("aria-pressed", String(heroStageUserPaused));
-  heroStageToggle.setAttribute("aria-label", heroStageUserPaused ? "继续轮播" : "暂停轮播");
-  const icon = heroStageToggle.querySelector<HTMLElement>("span");
-  if (icon) icon.textContent = heroStageUserPaused ? "▶" : "Ⅱ";
+  return heroStageInteractionPaused || heroStageMotionQuery.matches || document.hidden;
 }
 
 function scheduleHeroStageAutoplay() {
   stopHeroStageAutoplay();
-  updateHeroStagePauseControl();
-  if (heroStagedArtifacts.length < 2 || isHeroStageAutoplayPaused()) return;
+  const autoplayPaused = isHeroStageAutoplayPaused();
+  heroStageCaption?.setAttribute("aria-live", autoplayPaused ? "polite" : "off");
+  if (heroStagedArtifacts.length < 2 || autoplayPaused) return;
 
-  heroStageControls?.classList.remove("is-cycling");
-  void heroStageControls?.offsetWidth;
-  heroStageControls?.classList.add("is-cycling");
   heroStageAutoplayTimer = window.setTimeout(() => {
     if (document.body.dataset.route !== "home" || document.body.dataset.accessRole === "locked") {
       scheduleHeroStageAutoplay();
@@ -685,13 +797,6 @@ function updateHeroStageCaption(animate = false) {
       <strong>${escapeHtml(artifact.title)}</strong>
       <small>${escapeHtml(artifact.categoryLabel)} · ${escapeHtml(artifact.year)}</small>
     `;
-    if (heroStagePosition) {
-      heroStagePosition.textContent = `${String(heroStageActiveIndex + 1).padStart(2, "0")} / ${String(heroStagedArtifacts.length).padStart(2, "0")}`;
-      heroStagePosition.setAttribute(
-        "aria-label",
-        `第 ${heroStageActiveIndex + 1} 件，共 ${heroStagedArtifacts.length} 件`
-      );
-    }
   };
 
   window.clearTimeout(heroStageCaptionTimer);
@@ -740,7 +845,6 @@ function renderHeroStage() {
   heroStageAnimating = false;
   heroStageActiveIndex = 0;
   heroStagedArtifacts = allArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
-  heroStageControls?.toggleAttribute("hidden", heroStagedArtifacts.length < 2);
   if (heroStagedArtifacts.length === 0) return;
 
   heroStageGallery.replaceChildren(
@@ -770,7 +874,7 @@ function renderCategoryIndex() {
 
   const artifacts = allArtifacts();
   categoryIndex.replaceChildren(
-    ...categories.filter((category) => category.id !== "all").map((category, index) => {
+    ...artifactCategories.filter((category) => category.id !== "all").map((category, index) => {
       const count = artifacts.filter((artifact) => artifact.category === category.id).length;
       const button = document.createElement("button");
       button.type = "button";
@@ -799,7 +903,7 @@ export function renderFilters() {
   if (!filterBar) return;
   filterBar.replaceChildren();
 
-  categories.forEach((category) => {
+  artifactCategories.forEach((category) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "filter-button";
@@ -1162,6 +1266,7 @@ function artifactFormInput(): ArtifactFormInput | null {
     id: artifactFormId?.value || undefined,
     title,
     category,
+    categoryLabel: artifactCategories.find((item) => item.id === category)?.label ?? "个人藏品",
     year: artifactFormYear?.value.trim() ?? "",
     medium: artifactFormMedium?.value.trim() ?? "",
     rarity: artifactFormRarity?.value.trim() ?? "",
@@ -1182,6 +1287,8 @@ function artifactFormInput(): ArtifactFormInput | null {
 function resetArtifactForm(updateStatus = true) {
   releasePendingPreviewUrls();
   artifactForm?.reset();
+  closeCategoryEditor();
+  renderArtifactCategoryOptions("games");
   if (artifactFormId) artifactFormId.value = "";
   editingArtifactId = null;
   pendingCoverImage = "";
@@ -1267,7 +1374,8 @@ export function handleArtifactEdit(id: string) {
 
   if (artifactFormId) artifactFormId.value = artifact.id;
   if (artifactFormTitle) artifactFormTitle.value = artifact.title;
-  if (artifactFormCategory) artifactFormCategory.value = artifact.category;
+  closeCategoryEditor();
+  renderArtifactCategoryOptions(artifact.category);
   if (artifactFormYear) artifactFormYear.value = artifact.year;
   if (artifactFormMedium) artifactFormMedium.value = artifact.medium;
   if (artifactFormRarity) artifactFormRarity.value = artifact.rarity;
@@ -1473,21 +1581,35 @@ function bindManagementEvents() {
   artifactGalleryUpload?.addEventListener("change", (event) => {
     void handleGalleryUpload(event);
   });
+  artifactFormCategory?.addEventListener("change", () => {
+    if (artifactFormCategory.value === NEW_CATEGORY_VALUE) {
+      openCategoryEditor(null);
+      setManagementControlsDisabled();
+      return;
+    }
+
+    categorySelectionBeforeCreate = artifactFormCategory.value;
+    closeCategoryEditor();
+    setManagementControlsDisabled();
+  });
+  artifactCategoryEdit?.addEventListener("click", () => {
+    const category = artifactFormCategory?.value ?? "";
+    if (isArtifactCategory(category)) openCategoryEditor(category);
+  });
+  artifactCategorySave?.addEventListener("click", () => {
+    void handleCategorySave();
+  });
+  artifactCategoryCancel?.addEventListener("click", () => {
+    const restorePreviousSelection = editingCategoryId === null;
+    closeCategoryEditor(restorePreviousSelection);
+  });
   artifactFormReset?.addEventListener("click", () => resetArtifactForm());
 }
 
 function bindHeroStageEvents() {
-  heroStagePrevious?.addEventListener("click", () => moveHeroStage(-1));
-  heroStageNext?.addEventListener("click", () => moveHeroStage(1));
-  heroStageToggle?.addEventListener("click", () => {
-    heroStageUserPaused = !heroStageUserPaused;
-    scheduleHeroStageAutoplay();
-  });
-
   heroStageHost?.addEventListener("pointerenter", () => {
     heroStageInteractionPaused = true;
     stopHeroStageAutoplay();
-    updateHeroStagePauseControl();
   });
   heroStageHost?.addEventListener("pointerleave", () => {
     heroStageInteractionPaused = false;
@@ -1496,7 +1618,6 @@ function bindHeroStageEvents() {
   heroStageHost?.addEventListener("focusin", () => {
     heroStageInteractionPaused = true;
     stopHeroStageAutoplay();
-    updateHeroStagePauseControl();
   });
   heroStageHost?.addEventListener("focusout", (event) => {
     if (event.relatedTarget instanceof Node && heroStageHost.contains(event.relatedTarget)) return;
@@ -1524,11 +1645,12 @@ function bindRouteEvents() {
 
 function updateCounts() {
   if (artifactCount) artifactCount.textContent = String(allArtifacts().length).padStart(2, "0");
-  if (categoryCount) categoryCount.textContent = String(categories.length - 1).padStart(2, "0");
+  if (categoryCount) categoryCount.textContent = String(artifactCategories.length - 1).padStart(2, "0");
 }
 
 function initMuseum() {
   initMuseumCanvas();
+  renderArtifactCategoryOptions("games");
   updateCounts();
   renderHeroStage();
   renderFeatured();

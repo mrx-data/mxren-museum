@@ -1,4 +1,4 @@
-import { categories, type Artifact, type ArtifactCategory } from "./collection";
+import { categories as defaultCategories, type Artifact, type ArtifactCategory } from "./collection";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase-client";
 import {
   artifactStoragePaths,
@@ -16,6 +16,11 @@ export type ManagedSource = "local" | "remote";
 export type PersistenceMode = "local" | "supabase";
 type ArtifactGalleryImage = Artifact["galleryImages"][number];
 
+export type ArtifactCategoryDefinition = {
+  id: ArtifactCategory;
+  label: string;
+};
+
 export type GalleryImageInput = {
   src: string;
   alt?: string;
@@ -27,6 +32,7 @@ export type ArtifactFormInput = {
   id?: string;
   title: string;
   category: ArtifactCategory;
+  categoryLabel: string;
   year: string;
   medium: string;
   rarity: string;
@@ -98,9 +104,14 @@ type AdminLoginRow = {
   expires_at: string;
 };
 
+type ArtifactCategoryRow = {
+  id: string;
+  label: string;
+};
+
 const defaultGalleryLabels = ["细节", "记忆", "图板"];
 
-const defaultPaletteByCategory: Record<ArtifactCategory, Artifact["palette"]> = {
+const defaultPaletteByCategory: Record<string, Artifact["palette"]> = {
   games: {
     from: "#1B1111",
     via: "#6F2330",
@@ -121,7 +132,7 @@ const defaultPaletteByCategory: Record<ArtifactCategory, Artifact["palette"]> = 
   }
 };
 
-const symbolByCategory: Record<ArtifactCategory, string> = {
+const symbolByCategory: Record<string, string> = {
   games: "♜",
   landscapes: "◇",
   "personal-works": "✦"
@@ -153,11 +164,23 @@ function isManagedArtifact(value: unknown): value is ManagedArtifact {
 }
 
 function isArtifactCategory(value: string): value is ArtifactCategory {
-  return value === "games" || value === "landscapes" || value === "personal-works";
+  return value.trim().length > 0 && value.length <= 64;
 }
 
-function categoryLabel(category: ArtifactCategory) {
-  return categories.find((item) => item.id === category)?.label ?? "个人藏品";
+function categoryLabel(category: ArtifactCategory, preferredLabel = "") {
+  return (
+    preferredLabel.trim() ||
+    defaultCategories.find((item) => item.id === category)?.label ||
+    "个人藏品"
+  );
+}
+
+function paletteForCategory(category: ArtifactCategory) {
+  return defaultPaletteByCategory[category] ?? defaultPaletteByCategory["personal-works"];
+}
+
+function symbolForCategory(category: ArtifactCategory) {
+  return symbolByCategory[category] ?? symbolByCategory["personal-works"];
 }
 
 function normalizeText(value: string) {
@@ -244,13 +267,13 @@ function artifactFromInput(
     id,
     title,
     category,
-    categoryLabel: categoryLabel(category),
+    categoryLabel: categoryLabel(category, input.categoryLabel),
     volume: options.volume ?? volumeForManagedArtifact(existing, source),
     year: normalizeText(input.year) || String(new Date().getFullYear()),
     medium: normalizeText(input.medium) || "Digital Artifact",
     rarity: normalizeText(input.rarity) || (source === "remote" ? "云端馆藏" : "本地馆藏"),
     featured: input.featured,
-    symbol: options.symbol ?? symbolByCategory[category],
+    symbol: options.symbol ?? symbolForCategory(category),
     coverAlt: normalizeText(input.coverAlt ?? "") || `${title} 的藏品封面`,
     coverImage: normalizeText(options.coverImage ?? input.coverImage ?? ""),
     coverStoragePath: normalizeText(options.coverStoragePath ?? input.coverStoragePath ?? "") || undefined,
@@ -261,7 +284,7 @@ function artifactFromInput(
     coverThumbnailStoragePath:
       normalizeText(options.coverThumbnailStoragePath ?? input.coverThumbnailStoragePath ?? "") || undefined,
     galleryImages: normalizeGalleryImages(input, options.galleryImages),
-    palette: options.palette ?? defaultPaletteByCategory[category],
+    palette: options.palette ?? paletteForCategory(category),
     summary: normalizeText(input.summary),
     note: normalizeText(input.note),
     source,
@@ -315,14 +338,14 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     medium: row.medium?.trim() || "Digital Artifact",
     rarity: row.rarity?.trim() || "云端馆藏",
     featured: Boolean(row.featured),
-    symbol: row.symbol?.trim() || symbolByCategory[category],
+    symbol: row.symbol?.trim() || symbolForCategory(category),
     coverAlt: row.cover_alt?.trim() || `${title} 的藏品封面`,
     coverImage,
     coverStoragePath,
     coverThumbnailImage: coverThumbnailStoragePath ? publicArtifactImageUrl(coverThumbnailStoragePath) : coverImage,
     coverThumbnailStoragePath,
     galleryImages: galleryFromUnknown(row.gallery_images, title),
-    palette: row.palette ?? defaultPaletteByCategory[category],
+    palette: row.palette ?? paletteForCategory(category),
     summary: row.summary?.trim() || "",
     note: row.note?.trim() || "",
     source: "remote",
@@ -446,6 +469,49 @@ export function updateLocalArtifact(
 
 export function deleteLocalArtifact(id: string, existing: ManagedArtifact[]): ManagedArtifact[] {
   return existing.filter((artifact) => artifact.id !== id);
+}
+
+function defaultArtifactCategories(): ArtifactCategoryDefinition[] {
+  return defaultCategories
+    .filter((category) => category.id !== "all")
+    .map((category) => ({ id: category.id, label: category.label }));
+}
+
+export async function loadArtifactCategories(): Promise<ArtifactCategoryDefinition[]> {
+  if (!isSupabaseConfigured()) return defaultArtifactCategories();
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("museum_categories")
+    .select("id,label")
+    .order("sort_order", { ascending: true });
+
+  if (error) return defaultArtifactCategories();
+
+  const categoriesById = new Map(defaultArtifactCategories().map((category) => [category.id, category]));
+  (data as ArtifactCategoryRow[]).forEach((category) => {
+    const id = category.id?.trim();
+    const label = category.label?.trim();
+    if (id && label) categoriesById.set(id, { id, label });
+  });
+  return [...categoriesById.values()];
+}
+
+export async function saveRemoteArtifactCategory(
+  id: ArtifactCategory,
+  label: string,
+  session: AdminSession
+): Promise<ArtifactCategoryDefinition> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("save_museum_category", {
+    input_session_token: session.token,
+    input_category_id: id,
+    input_category_label: label
+  });
+
+  if (error) throw new Error(error.message);
+  const row = data as ArtifactCategoryRow;
+  return { id: row.id, label: row.label };
 }
 
 export async function loadRemoteArtifacts(): Promise<ManagedArtifact[]> {

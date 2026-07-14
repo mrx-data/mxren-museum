@@ -9,7 +9,7 @@
 - Tech stack: Vite 8.1.3, TypeScript, HTML, CSS, GSAP 3.15.0, Node.js validation script
 - Package manager: npm with `package-lock.json`
 - Asset mode: one user-provided `public/artifacts/blackMyth.png`; no generated placeholder set remains
-- Remote management mode: custom Supabase admin account table + Postgres RPC metadata writes + Edge Function signed Storage uploads
+- Remote management mode: custom Supabase admin account table + Postgres RPC artifact/category writes + Edge Function signed Storage uploads
 - Local fallback mode: browser-local managed artifacts can be read from the current browser profile if Supabase is unavailable; new writes stay disabled unless Supabase admin access is verified
 - GitHub repository: `https://github.com/mrx-data/mxren-museum`
 - Production site: `https://mrx-data.github.io/mxren-museum/`
@@ -56,6 +56,7 @@ Rules:
 - `src/collection.ts` owns shared artifact types and the single bundled `黑神话：悟空` entry. New collection content should normally be created through Supabase management rather than added as bundled samples.
 - `src/supabase-client.ts` owns Supabase client configuration. It reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, with the current project URL/publishable key as browser-safe defaults.
 - `src/artifact-store.ts` owns Supabase artifact queries, custom admin login/session helpers, artifact CRUD RPC calls, query helpers, and the browser-local fallback under `mxren-museum.local-artifacts.v1`.
+- Dynamic categories live in `public.museum_categories`; public reads populate the filters and management select, while `save_museum_category` requires the existing custom admin session and synchronizes renamed labels to artifact rows.
 - `src/artifact-images.ts` owns upload validation, WebP variants, signed uploads, Storage URL resolution, and image cleanup.
 - `src/main.ts` renders the entry gate, hero poster stage, featured artifacts, category index, filters, collection cards, counts, local PNG cover images, managed artifacts from Supabase or local fallback, locked/guest/admin access state, management form behavior, and the detail dialog gallery. It calls the motion module after initial render, filter refresh, and dialog operations.
 - `src/museum-motion.ts` owns the local GSAP + ScrollTrigger motion system: ambient background, ordered route entrance, opening timeline, scroll reveal, filter refresh, brass curator-mark breathing loop, desktop-light parallax, and dialog open/close animation. Home/featured/collection transitions must establish their initial hidden state before paint, then reveal heading copy, controls, and cards in that order. Scroll-triggered sections must also be pre-staged before entering the viewport, never hidden from an already-visible state.
@@ -69,9 +70,10 @@ Rules:
 - `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql` adds unique `source_artifact_id` overrides so admins can edit built-in artifacts without duplicating cards; deleting an override restores the TypeScript default.
 - `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql` deletes cloud override rows for removed sample IDs while preserving `black-myth-wukong`.
 - `supabase/migrations/20260713010000_artifact_storage_images.sql` adds cover thumbnail paths, removes direct client mutation policies, and makes metadata RPCs reject new Base64 payloads and foreign artifact paths.
+- `supabase/migrations/20260714020000_museum_categories.sql` removes the fixed artifact category constraint, creates public-readable category definitions, and adds the admin-only category save/rename RPC.
 - `supabase/functions/artifact-images/index.ts` verifies `X-Museum-Session` and prefers the runtime `SUPABASE_SECRET_KEYS` value to create signed uploads or delete owned objects; legacy Service Role is fallback-only.
 - `scripts/migrate-artifact-images.mjs` migrates historical Base64 with `--dry-run`, `--execute`, and guarded `--cleanup --backup-confirmed` modes.
-- Production Supabase status (2026-07-14): all repository migrations through `20260713010000` are applied and `artifact-images` Function version 1 is active; historical Base64 execute/cleanup remains pending and must not run without process-only Service Role variables plus a verified backup.
+- Production Supabase status (2026-07-14): all repository migrations through `20260714020000` are applied and `artifact-images` Function version 1 is active; historical Base64 execute/cleanup remains pending and must not run without process-only Service Role variables plus a verified backup.
 - To allow writes, create an admin row in `public.museum_admin_accounts` from Supabase SQL Editor after setting `search_path = public, extensions`, then use `crypt('<admin-password>', gen_salt('bf', 12))`. Do not commit filled password SQL, `sb_secret_...`, or legacy `service_role` keys. Public reads are allowed; writes go through admin-session RPC.
 - `public/artifacts/` contains only the user-provided `blackMyth.png`; the generated placeholder assets for the removed samples were deleted.
 - `scripts/validate-site.mjs` is a dependency-free structural gate. It checks required local PNG fields, file existence, GSAP dependency, motion hooks, and the motion module; update it when new required UI patterns or commands are added.

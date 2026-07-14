@@ -1,4 +1,4 @@
-export type ArtifactCategory = "games" | "landscapes" | "personal-works";
+export type ArtifactCategory = string;
 
 export type Artifact = {
   id: string;

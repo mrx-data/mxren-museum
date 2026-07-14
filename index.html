@@ -97,14 +97,6 @@
           <aside class="hero-cabinet" aria-label="藏馆摘要">
             <div class="hero-stage-card corner-flourish" data-motion-image>
               <div class="stage-rack" id="hero-stage-gallery" aria-label="精选藏品海报舞台"></div>
-              <div class="stage-carousel-controls" id="hero-stage-controls" aria-label="精选藏品轮播控制" hidden>
-                <button id="hero-stage-previous" type="button" aria-label="查看上一件精选藏品">‹</button>
-                <span id="hero-stage-position" class="stage-carousel-position" aria-label="第 1 件，共 1 件">01 / 01</span>
-                <button id="hero-stage-next" type="button" aria-label="查看下一件精选藏品">›</button>
-                <button id="hero-stage-toggle" class="stage-carousel-toggle" type="button" aria-label="暂停轮播" aria-pressed="false">
-                  <span aria-hidden="true">Ⅱ</span>
-                </button>
-              </div>
               <div class="stage-caption" id="hero-stage-caption" aria-live="polite">
                 <span>展厅 01</span>
                 <strong>正在布展</strong>
@@ -199,14 +191,26 @@
                   <span>藏品标题</span>
                   <input id="artifact-form-title" name="title" type="text" autocomplete="off" required />
                 </label>
-                <label>
-                  <span>类别</span>
-                  <select id="artifact-form-category" name="category" required>
-                    <option value="games">游戏藏品</option>
-                    <option value="landscapes">风景切片</option>
-                    <option value="personal-works">个人作品</option>
-                  </select>
-                </label>
+                <div class="category-form-field">
+                  <label for="artifact-form-category">类别</label>
+                  <div class="category-select-row">
+                    <select id="artifact-form-category" name="category" required>
+                      <option value="games">游戏藏品</option>
+                      <option value="landscapes">风景切片</option>
+                      <option value="personal-works">个人作品</option>
+                      <option value="__new_category__">＋ 新增类别…</option>
+                    </select>
+                    <button class="category-edit-button" id="artifact-category-edit" type="button">修改</button>
+                  </div>
+                  <div class="category-editor" id="artifact-category-editor" hidden>
+                    <label for="artifact-category-name">类别名称</label>
+                    <input id="artifact-category-name" type="text" maxlength="40" autocomplete="off" />
+                    <div class="category-editor-actions">
+                      <button id="artifact-category-save" type="button">保存类别</button>
+                      <button id="artifact-category-cancel" type="button">取消</button>
+                    </div>
+                  </div>
+                </div>
                 <label>
                   <span>年份</span>
                   <input id="artifact-form-year" name="year" type="text" inputmode="numeric" autocomplete="off" />

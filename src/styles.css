@@ -587,94 +587,6 @@ p {
   mix-blend-mode: screen;
 }
 
-.stage-carousel-controls {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 7;
-  display: grid;
-  grid-template-columns: 34px minmax(54px, auto) 34px 34px;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid rgba(201, 169, 98, 0.34);
-  border-radius: var(--radius);
-  background: rgba(20, 16, 14, 0.76);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(12px);
-}
-
-.stage-carousel-controls[hidden] {
-  display: none;
-}
-
-.stage-carousel-controls button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  min-height: 34px;
-  padding: 0;
-  border: 0;
-  border-left: 1px solid rgba(201, 169, 98, 0.18);
-  color: var(--accent);
-  background: transparent;
-  font-family: var(--font-display);
-  font-size: 19px;
-  cursor: pointer;
-  transition: color 220ms ease, background 220ms ease;
-}
-
-.stage-carousel-controls button:first-child {
-  border-left: 0;
-  border-right: 1px solid rgba(201, 169, 98, 0.18);
-}
-
-.stage-carousel-controls button:hover,
-.stage-carousel-controls button:focus-visible {
-  color: var(--foreground);
-  background: rgba(201, 169, 98, 0.12);
-}
-
-.stage-carousel-controls .stage-carousel-toggle {
-  font-size: 10px;
-}
-
-.stage-carousel-position {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 34px;
-  padding: 0 10px;
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-family: var(--font-display);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-}
-
-.stage-carousel-position::after {
-  position: absolute;
-  left: 0;
-  right: 100%;
-  bottom: 0;
-  height: 1px;
-  content: "";
-  background: var(--accent);
-}
-
-.stage-carousel-controls.is-cycling .stage-carousel-position::after {
-  animation: stage-carousel-meter 6800ms linear forwards;
-}
-
-.stage-carousel-controls[data-paused="true"] .stage-carousel-position::after {
-  animation-play-state: paused;
-}
-
-@keyframes stage-carousel-meter {
-  to {
-    right: 0;
-  }
-}
-
 .stage-caption {
   position: absolute;
   left: 24px;
@@ -1393,6 +1305,85 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 .upload-field {
   display: grid;
   gap: 8px;
+}
+
+.category-form-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.category-form-field > label,
+.category-editor > label {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.category-select-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.category-edit-button,
+.category-editor button {
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid rgba(201, 169, 98, 0.38);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 10px;
+  background: rgba(28, 23, 20, 0.64);
+  cursor: pointer;
+  transition:
+    color 220ms ease-out,
+    border-color 220ms ease-out,
+    background 220ms ease-out;
+}
+
+.category-edit-button:hover,
+.category-editor button:hover,
+.category-edit-button:focus-visible,
+.category-editor button:focus-visible {
+  color: var(--foreground);
+  border-color: rgba(201, 169, 98, 0.72);
+  background: rgba(201, 169, 98, 0.12);
+}
+
+.category-edit-button:disabled,
+.category-editor button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.category-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(201, 169, 98, 0.24);
+  border-radius: var(--radius);
+  background: rgba(20, 16, 14, 0.42);
+  animation: category-editor-reveal 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.category-editor[hidden] {
+  display: none;
+}
+
+.category-editor-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@keyframes category-editor-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
 }
 
 .wide-field {
@@ -2189,11 +2180,6 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 
   .stage-card[data-stage-position="3"] {
     transform: translateX(calc(-50% + 58px)) translateY(48px) rotate(9deg) scale(0.68);
-  }
-
-  .stage-carousel-controls {
-    top: 12px;
-    right: 12px;
   }
 
   .stage-caption {
