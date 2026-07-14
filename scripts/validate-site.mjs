@@ -163,6 +163,8 @@ assert(collection.includes('title: "黑神话：悟空"'), "Missing Black Myth: 
 assert(css.includes("dialog-image-strip"), "Missing dialog image strip styling");
 assert(css.includes(".image-zoom-trigger"), "Missing detail image zoom trigger styling");
 assert(css.includes(".image-lightbox-figure img"), "Missing full-size lightbox image styling");
+assert(css.includes('grid-template-areas: "previous lightbox-image next"'), "Lightbox image must keep its center grid area");
+assert(css.includes("grid-area: lightbox-image"), "Lightbox figure must not collapse into a hidden navigation column");
 assert(css.includes('.artifact-save-button[data-saving="true"]'), "Missing artifact save pending styling");
 assert(css.includes(".save-error-dialog"), "Missing themed artifact save error styling");
 assert(css.includes(".access-gate"), "Missing access gate styling");

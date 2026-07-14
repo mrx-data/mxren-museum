@@ -1689,6 +1689,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 .image-lightbox[open] {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) 72px;
+  grid-template-areas: "previous lightbox-image next";
   place-items: center;
 }
 
@@ -1698,6 +1699,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .image-lightbox-figure {
+  grid-area: lightbox-image;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   align-items: center;
@@ -1763,6 +1765,14 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   padding: 0;
   font-family: var(--font-display);
   font-size: 42px;
+}
+
+.image-lightbox-prev {
+  grid-area: previous;
+}
+
+.image-lightbox-next {
+  grid-area: next;
 }
 
 .image-lightbox-nav[hidden] {
