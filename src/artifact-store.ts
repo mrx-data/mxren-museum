@@ -4,7 +4,8 @@ import {
   artifactStoragePaths,
   deleteArtifactImages,
   publicArtifactImageUrl,
-  uploadArtifactImage
+  uploadArtifactImage,
+  uploadArtifactImages
 } from "./artifact-images";
 
 export const LOCAL_ARTIFACT_STORAGE_KEY = "mxren-museum.local-artifacts.v1";
@@ -568,8 +569,9 @@ async function uploadInputImages(
 
     if (input.galleryFiles?.length) {
       galleryImages = [];
-      for (const [index, file] of input.galleryFiles.slice(0, 3).entries()) {
-        const uploadedImage = await uploadArtifactImage(artifactId, file, session.token, false);
+      const galleryFiles = input.galleryFiles.slice(0, 3);
+      const uploadedGallery = await uploadArtifactImages(artifactId, galleryFiles, session.token);
+      for (const [index, uploadedImage] of uploadedGallery.entries()) {
         uploadedPaths.push(...uploadedImage.uploadedPaths);
         const metadata = input.galleryImages[index];
         galleryImages.push({

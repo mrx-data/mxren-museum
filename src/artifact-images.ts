@@ -30,6 +30,12 @@ export type UploadedImage = {
   uploadedPaths: string[];
 };
 
+type PreparedUploadGroup = {
+  file: File;
+  images: PreparedImage[];
+  uploads: SignedUpload[];
+};
+
 function uuid() {
   if (!globalThis.crypto?.randomUUID) throw new Error("当前浏览器不支持安全的图片上传标识");
   return globalThis.crypto.randomUUID();
@@ -155,19 +161,20 @@ async function requestSignedUploads(artifactId: string, images: PreparedImage[],
   return payload.uploads;
 }
 
-export async function uploadArtifactImage(
+async function uploadPreparedGroups(
   artifactId: string,
-  file: File,
-  sessionToken: string,
-  includeThumbnail: boolean
-): Promise<UploadedImage> {
-  const images = await prepareImage(file, includeThumbnail);
-  const signedUploads = await requestSignedUploads(artifactId, images, sessionToken);
-  const uploadedPaths: string[] = [];
-
-  try {
-    for (const [index, image] of images.entries()) {
-      const upload = signedUploads[index];
+  groups: PreparedUploadGroup[],
+  sessionToken: string
+): Promise<UploadedImage[]> {
+  const attempts = groups.flatMap((group) =>
+    group.images.map((image, imageIndex) => ({
+      file: group.file,
+      image,
+      upload: group.uploads[imageIndex]
+    }))
+  );
+  const results = await Promise.allSettled(
+    attempts.map(async ({ image, upload }) => {
       const { error } = await getSupabaseClient()
         .storage.from(SUPABASE_ARTIFACT_BUCKET)
         .uploadToSignedUrl(upload.path, upload.token, image.blob, {
@@ -176,23 +183,68 @@ export async function uploadArtifactImage(
           upsert: false
         });
       if (error) throw new Error(error.message);
-      uploadedPaths.push(upload.path);
-    }
-  } catch (error) {
-    await deleteArtifactImages(artifactId, uploadedPaths, sessionToken).catch(() => undefined);
-    throw error;
+      return upload.path;
+    })
+  );
+
+  const failedIndex = results.findIndex((result) => result.status === "rejected");
+  if (failedIndex >= 0) {
+    await deleteArtifactImages(
+      artifactId,
+      attempts.map(({ upload }) => upload.path),
+      sessionToken
+    ).catch(() => undefined);
+    const failed = results[failedIndex] as PromiseRejectedResult;
+    const detail = failed.reason instanceof Error ? failed.reason.message : "未知上传错误";
+    throw new Error(`图片「${attempts[failedIndex].file.name}」上传失败：${detail}`);
   }
 
-  const displayPath = signedUploads[images.findIndex((image) => image.variant === "display")].path;
-  const thumbnailIndex = images.findIndex((image) => image.variant === "thumbnail");
-  const thumbnailPath = thumbnailIndex >= 0 ? signedUploads[thumbnailIndex].path : undefined;
-  return {
-    displayPath,
-    displayUrl: publicArtifactImageUrl(displayPath),
-    thumbnailPath,
-    thumbnailUrl: publicArtifactImageUrl(thumbnailPath),
-    uploadedPaths
-  };
+  return groups.map((group) => {
+    const displayIndex = group.images.findIndex((image) => image.variant === "display");
+    const thumbnailIndex = group.images.findIndex((image) => image.variant === "thumbnail");
+    const displayPath = group.uploads[displayIndex].path;
+    const thumbnailPath = thumbnailIndex >= 0 ? group.uploads[thumbnailIndex].path : undefined;
+    return {
+      displayPath,
+      displayUrl: publicArtifactImageUrl(displayPath),
+      thumbnailPath,
+      thumbnailUrl: publicArtifactImageUrl(thumbnailPath),
+      uploadedPaths: group.uploads.map((upload) => upload.path)
+    };
+  });
+}
+
+export async function uploadArtifactImages(
+  artifactId: string,
+  files: File[],
+  sessionToken: string,
+  includeThumbnail = false
+): Promise<UploadedImage[]> {
+  if (files.length === 0) return [];
+  const preparedGroups: Array<{ file: File; images: PreparedImage[] }> = [];
+  for (const file of files) {
+    preparedGroups.push({ file, images: await prepareImage(file, includeThumbnail) });
+  }
+
+  const preparedImages = preparedGroups.flatMap((group) => group.images);
+  const signedUploads = await requestSignedUploads(artifactId, preparedImages, sessionToken);
+  let offset = 0;
+  const groups = preparedGroups.map((group) => {
+    const uploads = signedUploads.slice(offset, offset + group.images.length);
+    offset += group.images.length;
+    return { ...group, uploads };
+  });
+  return uploadPreparedGroups(artifactId, groups, sessionToken);
+}
+
+export async function uploadArtifactImage(
+  artifactId: string,
+  file: File,
+  sessionToken: string,
+  includeThumbnail: boolean
+): Promise<UploadedImage> {
+  const [uploaded] = await uploadArtifactImages(artifactId, [file], sessionToken, includeThumbnail);
+  return uploaded;
 }
 
 export async function deleteArtifactImages(artifactId: string, paths: string[], sessionToken: string) {

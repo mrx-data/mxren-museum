@@ -289,6 +289,17 @@
         <button class="dialog-close" type="button" aria-label="关闭藏品详情">×</button>
         <div id="dialog-body"></div>
       </dialog>
+
+      <dialog id="image-lightbox" class="image-lightbox" aria-labelledby="image-lightbox-caption">
+        <button class="image-lightbox-close" type="button" aria-label="关闭大图">×</button>
+        <button class="image-lightbox-nav image-lightbox-prev" type="button" aria-label="查看上一张详情图片">‹</button>
+        <figure class="image-lightbox-figure">
+          <img id="image-lightbox-image" alt="" decoding="async" />
+          <figcaption id="image-lightbox-caption"></figcaption>
+        </figure>
+        <button class="image-lightbox-nav image-lightbox-next" type="button" aria-label="查看下一张详情图片">›</button>
+        <span id="image-lightbox-counter" class="image-lightbox-counter" aria-live="polite"></span>
+      </dialog>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

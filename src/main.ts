@@ -73,6 +73,9 @@ let activeHash = "";
 let motionRefreshFrame = 0;
 let searchDebounceTimer = 0;
 let renderedAccessRole: AccessRole | null = null;
+let activeLightboxImages: Artifact["galleryImages"] = [];
+let activeLightboxIndex = 0;
+let lightboxTrigger: HTMLElement | null = null;
 const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
 const accessGate = document.querySelector<HTMLElement>("#access-gate");
@@ -94,6 +97,13 @@ const collectionGrid = document.querySelector<HTMLElement>("#collection-grid");
 const dialog = document.querySelector<HTMLDialogElement>("#artifact-dialog");
 const dialogBody = document.querySelector<HTMLElement>("#dialog-body");
 const dialogClose = document.querySelector<HTMLButtonElement>(".dialog-close");
+const imageLightbox = document.querySelector<HTMLDialogElement>("#image-lightbox");
+const imageLightboxImage = document.querySelector<HTMLImageElement>("#image-lightbox-image");
+const imageLightboxCaption = document.querySelector<HTMLElement>("#image-lightbox-caption");
+const imageLightboxCounter = document.querySelector<HTMLElement>("#image-lightbox-counter");
+const imageLightboxClose = document.querySelector<HTMLButtonElement>(".image-lightbox-close");
+const imageLightboxPrevious = document.querySelector<HTMLButtonElement>(".image-lightbox-prev");
+const imageLightboxNext = document.querySelector<HTMLButtonElement>(".image-lightbox-next");
 const artifactSearch = document.querySelector<HTMLInputElement>("#artifact-search");
 const artifactForm = document.querySelector<HTMLFormElement>("#artifact-form");
 const artifactFormHeading = document.querySelector<HTMLElement>("#artifact-form-heading");
@@ -668,6 +678,44 @@ function renderFeatured() {
   );
 }
 
+function renderImageLightbox() {
+  const image = activeLightboxImages[activeLightboxIndex];
+  if (!image || !imageLightboxImage || !imageLightboxCaption || !imageLightboxCounter) return;
+
+  imageLightboxImage.src = resolveAssetSrc(image.src);
+  imageLightboxImage.alt = image.alt;
+  imageLightboxCaption.textContent = image.label;
+  imageLightboxCounter.textContent = `${activeLightboxIndex + 1} / ${activeLightboxImages.length}`;
+  const hasMultipleImages = activeLightboxImages.length > 1;
+  if (imageLightboxPrevious) imageLightboxPrevious.hidden = !hasMultipleImages;
+  if (imageLightboxNext) imageLightboxNext.hidden = !hasMultipleImages;
+}
+
+function openImageLightbox(images: Artifact["galleryImages"], index: number, trigger: HTMLElement) {
+  if (!imageLightbox || images.length === 0) return;
+  activeLightboxImages = images;
+  activeLightboxIndex = Math.min(Math.max(index, 0), images.length - 1);
+  lightboxTrigger = trigger;
+  renderImageLightbox();
+  imageLightbox.showModal();
+  imageLightboxClose?.focus();
+}
+
+function closeImageLightbox(restoreFocus = true) {
+  if (!imageLightbox?.open) return;
+  imageLightbox.close();
+  activeLightboxImages = [];
+  activeLightboxIndex = 0;
+  if (restoreFocus) lightboxTrigger?.focus();
+  lightboxTrigger = null;
+}
+
+function moveImageLightbox(direction: -1 | 1) {
+  if (!imageLightbox?.open || activeLightboxImages.length < 2) return;
+  activeLightboxIndex = (activeLightboxIndex + direction + activeLightboxImages.length) % activeLightboxImages.length;
+  renderImageLightbox();
+}
+
 export function openArtifactDialog(artifact: Artifact) {
   if (!dialog || !dialogBody) return;
   dialogClosing = false;
@@ -703,17 +751,24 @@ export function openArtifactDialog(artifact: Artifact) {
   imageStrip.className = "dialog-image-strip";
   imageStrip.setAttribute("aria-label", `${artifact.title} 图片组`);
   setCoverStyle(imageStrip, artifact);
-  artifact.galleryImages.forEach((galleryImage) => {
+  artifact.galleryImages.forEach((galleryImage, index) => {
     const plate = document.createElement("figure");
     plate.className = "image-plate";
     plate.setAttribute("data-motion-item", "dialog-gallery");
 
+    const zoomButton = document.createElement("button");
+    zoomButton.className = "image-zoom-trigger";
+    zoomButton.type = "button";
+    zoomButton.setAttribute("aria-label", `放大查看${galleryImage.label}`);
+    zoomButton.setAttribute("aria-haspopup", "dialog");
     const image = createImageElement(galleryImage.src, galleryImage.alt);
     image.setAttribute("data-motion-image", "");
-    plate.append(image);
+    zoomButton.append(image);
+    zoomButton.addEventListener("click", () => openImageLightbox(artifact.galleryImages, index, zoomButton));
+    plate.append(zoomButton);
 
     const caption = document.createElement("figcaption");
-    caption.textContent = galleryImage.label;
+    caption.innerHTML = `<span>${escapeHtml(galleryImage.label)}</span><small>点击放大</small>`;
     plate.append(caption);
     imageStrip.append(plate);
   });
@@ -727,6 +782,7 @@ export function openArtifactDialog(artifact: Artifact) {
 export function closeArtifactDialog() {
   if (!dialog?.open || dialogClosing) return;
 
+  closeImageLightbox(false);
   dialogClosing = true;
   animateArtifactDialogClose(dialog, () => {
     dialog.close();
@@ -1194,7 +1250,34 @@ function bindDialogEvents() {
     closeArtifactDialog();
   });
 
+  imageLightboxClose?.addEventListener("click", () => closeImageLightbox());
+  imageLightboxPrevious?.addEventListener("click", () => moveImageLightbox(-1));
+  imageLightboxNext?.addEventListener("click", () => moveImageLightbox(1));
+
+  imageLightbox?.addEventListener("click", (event) => {
+    if (event.target === imageLightbox) closeImageLightbox();
+  });
+
+  imageLightbox?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeImageLightbox();
+  });
+
   document.addEventListener("keydown", (event) => {
+    if (imageLightbox?.open) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeImageLightbox();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveImageLightbox(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        moveImageLightbox(1);
+      }
+      return;
+    }
+
     if (event.key === "Escape" && dialog?.open) {
       closeArtifactDialog();
     }
