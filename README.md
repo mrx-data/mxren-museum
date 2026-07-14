@@ -72,7 +72,7 @@ Do not store a filled admin password, `sb_secret_...`, or legacy `service_role` 
 
 ## Browser-Local Management
 
-The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. Image previews use temporary object URLs; uploads are optimized to WebP where appropriate and sent directly to Supabase Storage. Gallery files share one signed-upload request, upload as a batch, and roll back together on failure. Detail images open in a full-size keyboard-accessible lightbox. Postgres stores paths and text metadata, not new Base64 payloads.
+The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. Image previews use temporary object URLs; uploads are optimized to WebP where supported, with an automatic JPEG fallback for browsers that cannot encode WebP, and sent directly to Supabase Storage. Gallery files share one signed-upload request, upload as a batch, and roll back together on failure. Detail images open in a full-size keyboard-accessible lightbox. Postgres stores paths and text metadata, not new Base64 payloads.
 
 If Supabase is not configured or the remote schema is unavailable, the app falls back to reading browser-local managed artifacts. This fallback is limited to the current browser profile and does not sync across devices, users, or browsers. New writes stay disabled until admin access can be verified through Supabase.
 

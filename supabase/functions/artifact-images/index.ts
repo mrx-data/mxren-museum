@@ -78,12 +78,19 @@ Deno.serve(async (request) => {
       const asset = value as Record<string, unknown>;
       const assetId = typeof asset.assetId === "string" ? asset.assetId : "";
       const variant = asset.variant === "display" || asset.variant === "thumbnail" ? asset.variant : "";
-      const extension = asset.extension === "webp" || asset.extension === "gif" ? asset.extension : "";
-      const contentType = asset.contentType === "image/webp" || asset.contentType === "image/gif" ? asset.contentType : "";
+      const extension = asset.extension === "webp" || asset.extension === "jpg" || asset.extension === "gif" ? asset.extension : "";
+      const contentType =
+        asset.contentType === "image/webp" || asset.contentType === "image/jpeg" || asset.contentType === "image/gif"
+          ? asset.contentType
+          : "";
       if (!uuidPattern.test(assetId) || !variant || !extension || !contentType) {
         return json({ error: "Invalid asset metadata" }, 400, origin);
       }
-      if ((extension === "gif") !== (contentType === "image/gif") || (variant === "thumbnail" && extension !== "webp")) {
+      const typeMatchesExtension =
+        (extension === "webp" && contentType === "image/webp") ||
+        (extension === "jpg" && contentType === "image/jpeg") ||
+        (extension === "gif" && contentType === "image/gif");
+      if (!typeMatchesExtension || (variant === "thumbnail" && extension === "gif")) {
         return json({ error: "Asset type does not match its variant" }, 400, origin);
       }
       paths.push(`artifacts/${artifactId}/${assetId}/${variant}.${extension}`);

@@ -12,10 +12,12 @@ type ImageVariant = "display" | "thumbnail";
 type PreparedImage = {
   assetId: string;
   variant: ImageVariant;
-  extension: "webp" | "gif";
-  contentType: "image/webp" | "image/gif";
+  extension: "webp" | "jpg" | "gif";
+  contentType: "image/webp" | "image/jpeg" | "image/gif";
   blob: Blob;
 };
+
+type OptimizedImage = Pick<PreparedImage, "extension" | "contentType" | "blob">;
 
 type SignedUpload = {
   path: string;
@@ -91,7 +93,11 @@ async function decodeImage(file: Blob) {
   return bitmap;
 }
 
-async function resizeAsWebp(file: Blob, maxWidth: number, maxHeight: number, quality: number) {
+function canvasBlob(canvas: HTMLCanvasElement, contentType: string, quality: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, contentType, quality));
+}
+
+async function resizeImage(file: Blob, maxWidth: number, maxHeight: number, quality: number): Promise<OptimizedImage> {
   const bitmap = await decodeImage(file);
   const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
   const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -109,10 +115,21 @@ async function resizeAsWebp(file: Blob, maxWidth: number, maxHeight: number, qua
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-  if (!blob || blob.type !== "image/webp") throw new Error("当前浏览器不支持 WebP 图片处理");
-  if (blob.size > MAX_OUTPUT_BYTES) throw new Error("优化后的图片仍超过 5MB，请选择尺寸更小的图片");
-  return blob;
+  const webp = await canvasBlob(canvas, "image/webp", quality);
+  if (webp?.type === "image/webp") {
+    if (webp.size > MAX_OUTPUT_BYTES) throw new Error("优化后的图片仍超过 5MB，请选择尺寸更小的图片");
+    return { blob: webp, extension: "webp", contentType: "image/webp" };
+  }
+
+  context.save();
+  context.globalCompositeOperation = "destination-over";
+  context.fillStyle = "#1c1714";
+  context.fillRect(0, 0, width, height);
+  context.restore();
+  const jpeg = await canvasBlob(canvas, "image/jpeg", Math.min(0.9, quality + 0.02));
+  if (!jpeg || jpeg.type !== "image/jpeg") throw new Error("当前浏览器无法生成可上传的图片，请升级浏览器后重试");
+  if (jpeg.size > MAX_OUTPUT_BYTES) throw new Error("优化后的图片仍超过 5MB，请选择尺寸更小的图片");
+  return { blob: jpeg, extension: "jpg", contentType: "image/jpeg" };
 }
 
 async function prepareImage(file: File, includeThumbnail: boolean): Promise<PreparedImage[]> {
@@ -121,20 +138,15 @@ async function prepareImage(file: File, includeThumbnail: boolean): Promise<Prep
   const display =
     file.type === "image/gif"
       ? { blob: file, extension: "gif" as const, contentType: "image/gif" as const }
-      : {
-          blob: await resizeAsWebp(file, 1600, 1600, 0.86),
-          extension: "webp" as const,
-          contentType: "image/webp" as const
-        };
+      : await resizeImage(file, 1600, 1600, 0.86);
   const prepared: PreparedImage[] = [{ assetId, variant: "display", ...display }];
 
   if (includeThumbnail) {
+    const thumbnail = await resizeImage(file, 720, 960, 0.8);
     prepared.push({
       assetId,
       variant: "thumbnail",
-      extension: "webp",
-      contentType: "image/webp",
-      blob: await resizeAsWebp(file, 720, 960, 0.8)
+      ...thumbnail
     });
   }
   return prepared;

@@ -41,6 +41,7 @@ function assert(condition, message) {
   "supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql",
   "supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql",
   "supabase/migrations/20260713010000_artifact_storage_images.sql",
+  "supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql",
   "supabase/functions/artifact-images/index.ts",
   "supabase/config.toml",
   "src/artifact-images.ts",
@@ -69,6 +70,7 @@ const supabasePasswordMigration = read("supabase/migrations/20260707010000_museu
 const supabaseOverrideMigration = read("supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql");
 const removeLegacySamplesMigration = read("supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql");
 const storageImagesMigration = read("supabase/migrations/20260713010000_artifact_storage_images.sql");
+const jpegStorageMigration = read("supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql");
 const artifactImages = read("src/artifact-images.ts");
 const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
@@ -403,13 +405,19 @@ assert(exists("src/artifact-store.ts"), "Missing local artifact store module");
   "uploadToSignedUrl",
   "uploadArtifactImages",
   "Promise.allSettled",
+  "canvasBlob",
+  "destination-over",
+  "image/jpeg",
   "createSignedUploadUrl",
   "X-Museum-Session",
   "cover_thumbnail_storage_path",
   "Base64 cover images are no longer accepted"
 ].forEach((pattern) => {
-  assert(`${artifactImages}\n${artifactStore}\n${storageFunction}\n${storageImagesMigration}`.includes(pattern), `Missing Storage image pattern: ${pattern}`);
+  assert(`${artifactImages}\n${artifactStore}\n${storageFunction}\n${storageImagesMigration}\n${jpegStorageMigration}`.includes(pattern), `Missing Storage image pattern: ${pattern}`);
 });
+
+assert(jpegStorageMigration.includes("display\\.(webp|jpg|gif)"), "JPEG display paths are not accepted by the database");
+assert(jpegStorageMigration.includes("thumbnail\\.(webp|jpg)"), "JPEG thumbnail paths are not accepted by the database");
 
 assert(!main.includes("readAsDataURL"), "Managed image previews must not create Base64 data URLs");
 assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migration command");
