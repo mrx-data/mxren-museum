@@ -74,6 +74,7 @@
         <nav class="site-nav" aria-label="主导航">
           <a href="#home" data-nav-route="home" data-nav-target="top">首页</a>
           <a href="#featured" data-nav-route="home" data-nav-target="featured">精选藏品</a>
+          <a href="#exhibitions" data-nav-route="exhibitions" data-nav-target="exhibitions">策展专题</a>
           <a href="#collection" data-nav-route="collection" data-nav-target="collection">馆藏目录</a>
           <a href="#manage" data-nav-route="manage" data-nav-target="manage">藏品管理</a>
           <a href="#notes" data-nav-route="home" data-nav-target="notes">策展原则</a>
@@ -133,31 +134,64 @@
           <div id="featured-gallery" class="featured-grid" aria-live="polite"></div>
         </section>
 
+        <section id="exhibitions" class="section-block page-section exhibitions-section" aria-labelledby="exhibitions-title" data-page="exhibitions" data-motion-section>
+          <div id="exhibition-index-view">
+            <div class="section-heading">
+              <p class="volume-label">Volume III</p>
+              <h2 id="exhibitions-title" data-motion-title>策展专题</h2>
+              <p>专题不是标签合集，而是一条有次序的观看路径。每份卷宗把几件藏品重新并置，让它们共同讲述一段记忆。</p>
+            </div>
+            <div id="exhibition-grid" class="exhibition-grid" aria-live="polite"></div>
+          </div>
+          <article id="exhibition-detail-view" class="exhibition-detail" hidden aria-live="polite"></article>
+        </section>
+
         <section id="collection" class="section-block page-section" aria-labelledby="collection-title" data-page="collection" data-motion-section>
           <div class="section-heading">
-            <p class="volume-label">Volume III</p>
+            <p class="volume-label">Volume IV</p>
             <h2 id="collection-title" data-motion-title>馆藏目录</h2>
             <p>按展厅分类进入目录，或直接在本季陈列里浏览编号藏品。每张封面都像一张可以反复细赏的私人海报。</p>
           </div>
           <div id="category-index" class="category-index" aria-label="馆藏分类入口"></div>
-          <div class="manager-search">
-            <label for="artifact-search">查询馆藏</label>
-            <input
-              id="artifact-search"
-              name="artifact-search"
-              type="search"
-              autocomplete="off"
-              aria-label="查询藏品标题、描述、类别、年份或媒介"
-              placeholder="输入标题、描述、类别、年份或媒介"
-            />
+          <div class="catalog-tools corner-flourish" aria-label="馆藏排序与筛选">
+            <div class="manager-search catalog-search">
+              <label for="artifact-search">查询馆藏</label>
+              <input
+                id="artifact-search"
+                name="artifact-search"
+                type="search"
+                autocomplete="off"
+                aria-label="查询藏品标题、描述、类别、年份、日期、媒介或标签"
+                placeholder="标题、描述、日期、媒介或标签"
+              />
+            </div>
+            <label class="catalog-select-field">
+              <span>日期</span>
+              <select id="artifact-year-filter" aria-label="按年份筛选藏品">
+                <option value="">全部年份</option>
+              </select>
+            </label>
+            <label class="catalog-select-field">
+              <span>排序</span>
+              <select id="artifact-sort" aria-label="藏品排序方式">
+                <option value="catalog">馆藏顺序</option>
+                <option value="date-desc">日期由新到旧</option>
+                <option value="date-asc">日期由旧到新</option>
+                <option value="updated-desc">最近更新</option>
+                <option value="title-asc">标题排序</option>
+              </select>
+            </label>
+            <button class="catalog-reset" id="artifact-filter-reset" type="button">清除筛选</button>
           </div>
           <div id="filter-bar" class="filter-bar" aria-label="按类别筛选藏品"></div>
+          <div id="tag-filter-bar" class="tag-filter-bar" aria-label="按标签筛选藏品"></div>
+          <p id="collection-result-count" class="collection-result-count" aria-live="polite"></p>
           <div id="collection-grid" class="collection-grid" aria-live="polite"></div>
         </section>
 
         <section id="manage" class="section-block page-section management-section" aria-labelledby="manage-title" data-page="manage" data-motion-section>
           <div class="section-heading">
-            <p class="volume-label">Volume IV</p>
+            <p class="volume-label">Volume V</p>
             <h2 id="manage-title" data-motion-title>藏品管理</h2>
             <p>新增数字标本，或修改已经入馆的藏品；内置藏品会保存为可恢复的云端版本。</p>
           </div>
@@ -214,6 +248,15 @@
                 <label>
                   <span>年份</span>
                   <input id="artifact-form-year" name="year" type="text" inputmode="numeric" autocomplete="off" />
+                </label>
+                <label>
+                  <span>精确日期</span>
+                  <input id="artifact-form-date" name="artifact-date" type="date" />
+                </label>
+                <label class="form-field-wide">
+                  <span>标签</span>
+                  <input id="artifact-form-tags" name="tags" type="text" maxlength="320" autocomplete="off" placeholder="东方神话，旅程，年度收藏" />
+                  <small>使用逗号分隔，最多 12 个</small>
                 </label>
                 <label>
                   <span>媒介</span>
@@ -298,9 +341,75 @@
                   <p class="volume-label">Collection ledger</p>
                   <h3 id="manager-list-title">全部馆藏</h3>
                 </div>
+                <div class="manager-ledger-actions">
+                  <button class="button button-secondary" id="museum-export-json" type="button" hidden>导出 JSON</button>
+                  <button class="button button-secondary" id="artifact-trash-toggle" type="button" aria-expanded="false" aria-controls="artifact-trash-panel" hidden>
+                    回收站 <span id="artifact-trash-count">0</span>
+                  </button>
+                </div>
               </div>
               <div id="artifact-manager-list" class="manager-list" aria-live="polite"></div>
+              <section id="artifact-trash-panel" class="trash-panel" aria-labelledby="artifact-trash-title" hidden>
+                <div class="trash-heading">
+                  <div>
+                    <p class="volume-label">Archive recovery</p>
+                    <h4 id="artifact-trash-title">回收站</h4>
+                  </div>
+                  <p>恢复会保留原图与全部编目；彻底删除后无法撤销。</p>
+                </div>
+                <div id="artifact-trash-list" class="manager-list" aria-live="polite"></div>
+              </section>
             </div>
+
+            <section class="exhibition-manager" aria-labelledby="exhibition-manager-title">
+              <div class="form-heading">
+                <div>
+                  <p class="volume-label">Curatorial dossiers</p>
+                  <h3 id="exhibition-manager-title">策展专题</h3>
+                </div>
+                <p class="status-line" id="exhibition-manager-status" aria-live="polite">等待管理员编辑</p>
+              </div>
+              <form id="exhibition-form" class="exhibition-form" hidden>
+                <div class="form-grid">
+                  <label>
+                    <span>专题标题</span>
+                    <input id="exhibition-form-title" type="text" maxlength="80" required />
+                  </label>
+                  <label>
+                    <span>专题标识</span>
+                    <input id="exhibition-form-id" type="text" pattern="[a-z0-9][a-z0-9-]{2,63}" maxlength="64" placeholder="myth-journey" required />
+                    <small>用于稳定链接，仅小写字母、数字和连字符</small>
+                  </label>
+                </div>
+                <label class="wide-field">
+                  <span>专题导语</span>
+                  <textarea id="exhibition-form-summary" rows="3" maxlength="280" required></textarea>
+                </label>
+                <label class="wide-field">
+                  <span>策展说明</span>
+                  <textarea id="exhibition-form-note" rows="4" maxlength="4000"></textarea>
+                </label>
+                <fieldset class="visibility-field">
+                  <legend>专题状态</legend>
+                  <div class="visibility-options">
+                    <label><input name="exhibition-visibility" type="radio" value="draft" checked /><span class="visibility-option-copy"><strong>草稿</strong><small>仅管理员可见</small></span></label>
+                    <label><input name="exhibition-visibility" type="radio" value="published" /><span class="visibility-option-copy"><strong>已发布</strong><small>进入专题展厅</small></span></label>
+                    <label><input name="exhibition-visibility" type="radio" value="unlisted" /><span class="visibility-option-copy"><strong>非公开</strong><small>仅凭链接访问</small></span></label>
+                  </div>
+                </fieldset>
+                <fieldset class="exhibition-artifact-field">
+                  <legend>专题藏品与顺序</legend>
+                  <p>先勾选藏品，再用上下按钮调整观看顺序。</p>
+                  <div id="exhibition-artifact-options" class="exhibition-artifact-options"></div>
+                  <ol id="exhibition-artifact-order" class="exhibition-artifact-order" aria-live="polite"></ol>
+                </fieldset>
+                <div class="form-actions">
+                  <button class="button button-primary" id="exhibition-save" type="submit">保存专题</button>
+                  <button class="button button-secondary" id="exhibition-reset" type="button">新建专题</button>
+                </div>
+              </form>
+              <div id="exhibition-manager-list" class="manager-list exhibition-manager-list" aria-live="polite"></div>
+            </section>
           </div>
         </section>
 
@@ -308,7 +417,7 @@
 
         <section id="notes" class="curator-notes corner-flourish" aria-labelledby="notes-title" data-page="home" data-motion-section>
           <div>
-            <p class="volume-label">Volume V</p>
+            <p class="volume-label">Volume VI</p>
             <h2 id="notes-title" data-motion-title>策展原则</h2>
           </div>
           <div class="note-ledger">

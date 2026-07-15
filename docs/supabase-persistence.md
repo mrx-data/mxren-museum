@@ -1,6 +1,6 @@
 # Supabase Persistence Runbook
 
-Production status (2026-07-15): migrations through `20260715010000_artifact_visibility_and_sharing.sql` are applied and pass remote schema lint. The `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
+Production status (2026-07-15): migrations through `20260716010000_catalog_trash_and_exhibitions.sql` are applied and pass remote schema lint. The `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
 
 mxren-museum remains a static GitHub Pages site. Supabase provides the runtime persistence layer for managed artifacts and custom admin login:
 
@@ -14,6 +14,9 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 - Admin credentials: passwords are stored as `pgcrypto.crypt()` hashes; the frontend never reads the hash.
 - Admin sessions: `public.museum_admin_sessions` stores hashed short-lived session tokens returned by `verify_museum_admin_login`.
 - Visibility: `draft` is admin-only, `published` appears in public listings, and `unlisted` is omitted from listings but available through its stable deep link.
+- Catalog metadata: `tags` stores a normalized text array and `artifact_date` stores an optional exact date used by tag/year facets and sorting.
+- Trash: `deleted_at` is a soft-delete tombstone. Normal public/admin lists exclude it; admins use `load_museum_trash`, `restore_museum_artifact`, and `purge_museum_artifact` for the recovery lifecycle.
+- Exhibitions: `public.museum_exhibitions` stores a stable slug, narrative copy, visibility, and ordered artifact IDs. Public reads expose published exhibitions only; admin writes verify the existing custom session.
 - RLS/RPC: direct anonymous reads from `public.artifacts` are revoked by the visibility migration. Public lists and single-artifact deep links use `load_museum_artifacts` and `load_museum_artifact`; writes use session-verified CRUD RPC functions.
 - Access roles: `locked` hides the museum, `guest` is read-only, and `admin` is granted only after the admin session token is verified by `verify_museum_admin_session`.
 
@@ -29,8 +32,9 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 8. Run `supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql`.
 9. Run `supabase/migrations/20260714020000_museum_categories.sql`.
 10. Run `supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql`.
-11. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
-12. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
+11. Run `supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql`.
+12. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
+13. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
 set search_path = public, extensions;
@@ -45,7 +49,7 @@ set
   updated_at = now();
 ```
 
-13. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, test all three visibility states, add or rename a category, edit `黑神话：悟空`, and create a test artifact.
+14. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, test all three visibility states, add or rename a category, edit `黑神话：悟空`, create a test artifact, restore it from trash, export JSON, and save a draft exhibition.
 
 ## Environment
 
@@ -93,6 +97,10 @@ npm run migrate:artifact-images -- --cleanup --backup-confirmed
 - Built-in edit check: editing a sample artifact creates one row whose `source_artifact_id` matches the sample ID; the gallery keeps one card, and `恢复内置` deletes the override and restores the original content.
 - Visibility check: guests cannot list or directly query drafts; unlisted artifacts stay out of home/featured/collection but open through `#artifact/{id}`; admins can preview all states.
 - Deep-link check: opening a card updates the hash, refresh restores the dialog, copy-link uses the absolute site URL, and closing returns to the originating route.
+- Catalog check: tags and exact dates survive refresh; keyword/category/tag/year filters compose; catalog/date/update/title sorts are stable; resetting returns to the full catalog.
+- Export check: the downloaded `mxren-museum.export.v1` JSON includes active artifacts, trash, categories, and exhibitions but no `data:` payload, password, secret, or admin session.
+- Trash check: ordinary delete removes the artifact from public/admin active lists without deleting images; restore returns it; permanent purge requires a second confirmation and attempts Storage cleanup only after database deletion.
+- Exhibition check: guests list only published exhibitions; admins can edit drafts, reorder artifact references, preview a deep link, and delete a record without modifying the referenced artifacts.
 
 ## Failure Modes
 
@@ -107,3 +115,4 @@ npm run migrate:artifact-images -- --cleanup --backup-confirmed
 - Missing Edge Function or Storage migration: metadata remains readable, but new image uploads fail without storing a partial artifact row.
 - Missing category migration: built-in categories remain readable as a frontend fallback, but adding or renaming a category fails safely without changing artifact data.
 - Missing visibility migration: the frontend temporarily falls back to legacy published reads, while remote deep links and visibility writes remain unavailable until the migration is applied.
+- Missing catalog/trash/exhibition migration: legacy artifact reads still render, but tag/date writes, trash operations, and exhibition RPCs fail safely until `20260716010000` is applied.

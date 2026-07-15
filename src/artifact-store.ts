@@ -19,6 +19,7 @@ export { isSupabaseConfigured };
 
 export type ManagedSource = "local" | "remote";
 export type PersistenceMode = "local" | "supabase";
+export type ArtifactSort = "catalog" | "date-desc" | "date-asc" | "updated-desc" | "title-asc";
 type ArtifactGalleryImage = Artifact["galleryImages"][number];
 
 export type ArtifactCategoryDefinition = {
@@ -38,6 +39,8 @@ export type ArtifactFormInput = {
   title: string;
   category: ArtifactCategory;
   categoryLabel: string;
+  tags: string[];
+  artifactDate?: string;
   year: string;
   medium: string;
   rarity: string;
@@ -86,6 +89,8 @@ type ArtifactRow = {
   title: string;
   category: string;
   category_label: string | null;
+  tags?: unknown;
+  artifact_date?: string | null;
   volume: string | null;
   year: string | null;
   medium: string | null;
@@ -101,7 +106,9 @@ type ArtifactRow = {
   palette: Artifact["palette"] | null;
   summary: string | null;
   note: string | null;
+  created_at?: string | null;
   updated_at: string | null;
+  deleted_at?: string | null;
 };
 
 type AdminLoginRow = {
@@ -194,6 +201,25 @@ function normalizeText(value: string) {
   return value.trim();
 }
 
+export function normalizeArtifactTags(values: string[] | string) {
+  const source = Array.isArray(values) ? values : values.split(/[,，\n]/);
+  const seen = new Set<string>();
+  return source
+    .map((value) => value.trim().replace(/^#+/, ""))
+    .filter((value) => {
+      const key = value.toLocaleLowerCase("zh-CN");
+      if (!value || value.length > 24 || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 12);
+}
+
+function normalizeArtifactDate(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  return Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? undefined : value;
+}
+
 function normalizeVisibility(value: unknown): ArtifactVisibility {
   return value === "draft" || value === "unlisted" ? value : "published";
 }
@@ -279,8 +305,10 @@ function artifactFromInput(
     title,
     category,
     categoryLabel: categoryLabel(category, input.categoryLabel),
+    tags: normalizeArtifactTags(input.tags),
+    artifactDate: normalizeArtifactDate(input.artifactDate),
     volume: options.volume ?? volumeForManagedArtifact(existing, source),
-    year: normalizeText(input.year) || String(new Date().getFullYear()),
+    year: normalizeText(input.year) || normalizeArtifactDate(input.artifactDate)?.slice(0, 4) || String(new Date().getFullYear()),
     medium: normalizeText(input.medium) || "Digital Artifact",
     rarity: normalizeText(input.rarity) || (source === "remote" ? "云端馆藏" : "本地馆藏"),
     featured: input.featured,
@@ -303,6 +331,7 @@ function artifactFromInput(
     ownerId: options.ownerId,
     remoteId: options.remoteId,
     sourceArtifactId: options.sourceArtifactId,
+    createdAt: now,
     updatedAt: now
   };
 }
@@ -345,6 +374,8 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     title,
     category,
     categoryLabel: row.category_label?.trim() || categoryLabel(category),
+    tags: Array.isArray(row.tags) ? normalizeArtifactTags(row.tags.filter((tag): tag is string => typeof tag === "string")) : [],
+    artifactDate: normalizeArtifactDate(row.artifact_date),
     volume: row.volume?.trim() || "C00",
     year: row.year?.trim() || String(new Date().getFullYear()),
     medium: row.medium?.trim() || "Digital Artifact",
@@ -365,6 +396,8 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     ownerId: row.owner_id ?? undefined,
     remoteId: row.id,
     sourceArtifactId,
+    createdAt: row.created_at ?? undefined,
+    deletedAt: row.deleted_at ?? undefined,
     updatedAt: row.updated_at ?? new Date().toISOString()
   };
 }
@@ -377,6 +410,8 @@ function rowFromArtifact(artifact: ManagedArtifact) {
     title: artifact.title,
     category: artifact.category,
     category_label: artifact.categoryLabel,
+    tags: normalizeArtifactTags(artifact.tags),
+    artifact_date: artifact.artifactDate ?? null,
     volume: artifact.volume,
     year: artifact.year,
     medium: artifact.medium,
@@ -411,6 +446,8 @@ export function loadLocalArtifacts(storage?: Storage): ManagedArtifact[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isManagedArtifact).map((artifact) => ({
       ...artifact,
+      tags: normalizeArtifactTags(Array.isArray(artifact.tags) ? artifact.tags : []),
+      artifactDate: normalizeArtifactDate(artifact.artifactDate),
       visibility: normalizeVisibility(artifact.visibility),
       source: "local"
     }));
@@ -551,6 +588,15 @@ export async function loadRemoteArtifacts(session: AdminSession | null = null): 
 
   if (legacyResult.error) throw new Error(error.message);
   return (legacyResult.data as unknown as ArtifactRow[]).map(artifactFromRow);
+}
+
+export async function loadRemoteTrash(session: AdminSession): Promise<ManagedArtifact[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("load_museum_trash", {
+    input_session_token: session.token
+  });
+  if (error) throw new Error(error.message);
+  return (data as ArtifactRow[]).map(artifactFromRow);
 }
 
 export async function loadHiddenSourceArtifactIds(): Promise<string[] | null> {
@@ -807,9 +853,32 @@ export async function updateRemoteArtifact(
   }
 }
 
-export async function deleteRemoteArtifact(id: string, session: AdminSession, storagePaths: string[] = []) {
+export async function deleteRemoteArtifact(id: string, session: AdminSession) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.rpc("delete_museum_artifact", {
+  const { error } = await supabase.rpc("trash_museum_artifact", {
+    input_session_token: session.token,
+    artifact_id: id
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function restoreRemoteArtifact(id: string, session: AdminSession) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("restore_museum_artifact", {
+    input_session_token: session.token,
+    artifact_id: id
+  });
+  if (error) throw new Error(error.message);
+  return artifactFromRow(data as ArtifactRow);
+}
+
+export async function purgeRemoteArtifact(
+  id: string,
+  session: AdminSession,
+  storagePaths: string[] = []
+) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc("purge_museum_artifact", {
     input_session_token: session.token,
     artifact_id: id
   });
@@ -818,25 +887,36 @@ export async function deleteRemoteArtifact(id: string, session: AdminSession, st
     await deleteArtifactImages(id, storagePaths, session.token);
     return "";
   } catch (cleanupError) {
-    console.warn("Artifact deleted, but its images could not be removed", cleanupError);
-    return "藏品已删除，但旧图片清理失败，可稍后重试";
+    console.warn("Artifact purged, but its images could not be removed", cleanupError);
+    return "藏品已彻底删除，但旧图片清理失败，可稍后在 Storage 中清理";
   }
 }
 
 export function queryArtifacts(
   artifacts: Artifact[],
   query: string,
-  filter: "all" | ArtifactCategory
+  filter: "all" | ArtifactCategory,
+  options: {
+    tag?: string;
+    year?: string;
+    sort?: ArtifactSort;
+  } = {}
 ): Artifact[] {
   const normalizedQuery = query.trim().toLowerCase();
-  return artifacts.filter((artifact) => {
+  const filtered = artifacts.filter((artifact) => {
     const categoryMatches = filter === "all" || artifact.category === filter;
     if (!categoryMatches) return false;
+    if (options.tag && !artifact.tags.some((tag) => tag === options.tag)) return false;
+    if (options.year && artifact.artifactDate?.slice(0, 4) !== options.year && artifact.year !== options.year) {
+      return false;
+    }
     if (!normalizedQuery) return true;
 
     return [
       artifact.title,
       artifact.categoryLabel,
+      ...artifact.tags,
+      artifact.artifactDate ?? "",
       artifact.year,
       artifact.medium,
       artifact.rarity,
@@ -846,5 +926,36 @@ export function queryArtifacts(
       .join(" ")
       .toLowerCase()
       .includes(normalizedQuery);
+  });
+
+  const originalOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
+  const dateValue = (artifact: Artifact) => {
+    const value = artifact.artifactDate ?? (artifact.year ? `${artifact.year}-01-01` : "");
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  };
+  const updatedValue = (artifact: Artifact) => {
+    const timestamp = Date.parse(artifact.updatedAt ?? artifact.artifactDate ?? "");
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  };
+
+  return [...filtered].sort((first, second) => {
+    switch (options.sort ?? "catalog") {
+      case "date-desc":
+        return dateValue(second) - dateValue(first) || (originalOrder.get(first.id) ?? 0) - (originalOrder.get(second.id) ?? 0);
+      case "date-asc": {
+        const firstDate = dateValue(first);
+        const secondDate = dateValue(second);
+        if (!firstDate && secondDate) return 1;
+        if (firstDate && !secondDate) return -1;
+        return firstDate - secondDate || (originalOrder.get(first.id) ?? 0) - (originalOrder.get(second.id) ?? 0);
+      }
+      case "updated-desc":
+        return updatedValue(second) - updatedValue(first) || (originalOrder.get(first.id) ?? 0) - (originalOrder.get(second.id) ?? 0);
+      case "title-asc":
+        return first.title.localeCompare(second.title, "zh-CN");
+      default:
+        return (originalOrder.get(first.id) ?? 0) - (originalOrder.get(second.id) ?? 0);
+    }
   });
 }

@@ -44,9 +44,12 @@ function assert(condition, message) {
   "supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql",
   "supabase/migrations/20260714020000_museum_categories.sql",
   "supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql",
+  "supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql",
   "supabase/functions/artifact-images/index.ts",
   "supabase/config.toml",
   "src/artifact-images.ts",
+  "src/exhibition-store.ts",
+  "src/museum-export.ts",
   "scripts/migrate-artifact-images.mjs",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
@@ -75,7 +78,10 @@ const storageImagesMigration = read("supabase/migrations/20260713010000_artifact
 const jpegStorageMigration = read("supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql");
 const museumCategoriesMigration = read("supabase/migrations/20260714020000_museum_categories.sql");
 const artifactVisibilityMigration = read("supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql");
+const catalogExhibitionsMigration = read("supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql");
 const artifactImages = read("src/artifact-images.ts");
+const exhibitionStore = read("src/exhibition-store.ts");
+const museumExport = read("src/museum-export.ts");
 const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
@@ -108,7 +114,7 @@ assert(!`${main}\n${css}\n${html}`.includes("wax-seal") && !html.includes("蜡�
 });
 assert(html.includes("被馆藏印记收录") && html.includes("列入精选馆藏"), "Missing curator-mark interface copy");
 
-["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V"].forEach((label) => {
+["Volume I", "Volume II", "Volume III", "Volume IV", "Volume V", "Volume VI"].forEach((label) => {
   assert(html.includes(label), `Missing Roman volume label: ${label}`);
 });
 
@@ -120,6 +126,14 @@ assert(html.includes('id="image-lightbox"'), "Missing detail image lightbox");
 assert(html.includes('id="artifact-save-button"'), "Missing artifact save feedback button");
 assert(html.includes('id="artifact-save-error"'), "Missing artifact save error dialog");
 assert(html.includes('name="visibility"'), "Missing artifact visibility controls");
+assert(html.includes('id="artifact-form-tags"'), "Missing artifact tags input");
+assert(html.includes('id="artifact-form-date"'), "Missing artifact date input");
+assert(html.includes('id="artifact-sort"'), "Missing artifact sort control");
+assert(html.includes('id="artifact-year-filter"'), "Missing artifact year filter");
+assert(html.includes('id="museum-export-json"'), "Missing JSON export control");
+assert(html.includes('id="artifact-trash-panel"'), "Missing artifact trash panel");
+assert(html.includes('id="exhibition-form"'), "Missing exhibition management form");
+assert(html.includes('id="exhibition-grid"'), "Missing exhibition public gallery");
 assert(html.includes("id=\"app\""), "Missing app mount point");
 assert(html.includes("id=\"access-gate\""), "Missing access gate");
 assert(html.includes("id=\"gate-guest-access\""), "Missing gate guest access control");
@@ -182,9 +196,26 @@ assert(main.includes("#artifact/"), "Missing artifact deep-link route");
 assert(main.includes("navigator.share"), "Missing native artifact share flow");
 assert(main.includes("navigator.clipboard"), "Missing artifact link copy fallback");
 assert(main.includes("hiddenSourceIdsForResult"), "Hidden sample overrides must fail closed");
+assert(main.includes("renderCatalogFacets"), "Missing catalog tag/date facets");
+assert(main.includes("handleMuseumExport"), "Missing JSON export interaction");
+assert(main.includes("handleArtifactRestore"), "Missing trash restore interaction");
+assert(main.includes("handleArtifactPurge"), "Missing trash purge interaction");
+assert(main.includes("renderExhibitions"), "Missing exhibition rendering");
+assert(main.includes("syncExhibitionForRoute"), "Missing exhibition deep-link route");
 assert(artifactVisibilityMigration.includes("load_museum_artifacts"), "Missing visibility-aware list RPC");
 assert(artifactVisibilityMigration.includes("load_museum_artifact"), "Missing artifact deep-link RPC");
 assert(artifactVisibilityMigration.includes("revoke select on public.artifacts"), "Artifact table must not remain directly public-readable");
+assert(catalogExhibitionsMigration.includes("artifact_date"), "Missing artifact date schema");
+assert(catalogExhibitionsMigration.includes("tags text[]"), "Missing artifact tags schema");
+assert(catalogExhibitionsMigration.includes("deleted_at"), "Missing artifact soft-delete schema");
+assert(catalogExhibitionsMigration.includes("trash_museum_artifact"), "Missing trash RPC");
+assert(catalogExhibitionsMigration.includes("restore_museum_artifact"), "Missing restore RPC");
+assert(catalogExhibitionsMigration.includes("purge_museum_artifact"), "Missing purge RPC");
+assert(catalogExhibitionsMigration.includes("museum_exhibitions"), "Missing exhibitions table");
+assert(catalogExhibitionsMigration.includes("load_museum_exhibition"), "Missing exhibition read RPC");
+assert(exhibitionStore.includes("saveMuseumExhibition"), "Missing exhibition store save helper");
+assert(museumExport.includes("mxren-museum.export.v1"), "Missing versioned museum JSON export format");
+assert(!museumExport.includes("session.token"), "Museum export must not include admin session tokens");
 
 assert(main.includes("addEventListener(\"click\""), "Missing click interaction wiring");
 assert(main.includes("Escape"), "Missing Escape key dialog handling");

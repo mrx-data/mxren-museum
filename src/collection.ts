@@ -6,6 +6,8 @@ export type Artifact = {
   title: string;
   category: ArtifactCategory;
   categoryLabel: string;
+  tags: string[];
+  artifactDate?: string;
   volume: string;
   year: string;
   medium: string;
@@ -31,7 +33,9 @@ export type Artifact = {
   summary: string;
   note: string;
   source?: "sample" | "local" | "remote";
+  createdAt?: string;
   updatedAt?: string;
+  deletedAt?: string;
   coverStoragePath?: string;
   coverThumbnailStoragePath?: string;
   remoteId?: string;
@@ -51,6 +55,8 @@ export const artifacts: Artifact[] = [
     title: "黑神话：悟空",
     category: "games",
     categoryLabel: "游戏藏品",
+    tags: ["东方神话", "动作角色扮演"],
+    artifactDate: "2024-08-20",
     volume: "I",
     year: "2024",
     medium: "Game Cover / Myth Archive",

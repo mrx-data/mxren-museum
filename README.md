@@ -24,6 +24,10 @@ npm run migrate:artifact-images -- --dry-run
 - Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
 - Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
 - Artifacts support `draft`, `published`, and `unlisted` visibility. Drafts are admin-only, published artifacts enter public listings, and unlisted artifacts are available only through their stable link.
+- Artifacts support normalized tags and an optional exact date. The collection combines keyword, category, tag, and year filters with catalog/date/update/title sorting.
+- Admin deletion is recoverable: ordinary deletion moves an artifact to the trash, where it can be restored or permanently purged after a second confirmation.
+- Admins can export a versioned JSON archive containing artifact, category, exhibition, and trash metadata without image binaries, credentials, or session tokens.
+- Curated exhibitions are stored independently from artifacts and support draft/published visibility plus an ordered artifact sequence. Public routes are `#exhibitions` and `#exhibition/{id}`.
 - Artifact dialogs use GitHub Pages-compatible `#artifact/{id}` deep links with copy-link and native share actions; refreshing a deep link restores the same detail view after entry.
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, ordered home/featured/collection route entrances, pre-staged scroll reveal, filter refresh, and detail dialog animation.
@@ -55,8 +59,9 @@ One-time Supabase setup:
 7. Run `supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql`.
 8. Run `supabase/migrations/20260714020000_museum_categories.sql`.
 9. Run `supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql`.
-10. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
-11. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+10. Run `supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql`.
+11. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
+12. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 
@@ -96,15 +101,17 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `index.html` | Semantic shell and museum sections |
 | `src/collection.ts` | Shared artifact types and the single bundled `黑神话：悟空` artifact |
 | `src/supabase-client.ts` | Supabase client and publishable-key configuration |
-| `src/artifact-store.ts` | Supabase artifact query, admin-login RPC helpers, artifact CRUD RPC, and browser-local fallback |
+| `src/artifact-store.ts` | Supabase artifact query, tag/date normalization, sorting, admin-login RPC helpers, trash lifecycle, and browser-local fallback |
 | `src/artifact-images.ts` | Browser image validation, WebP variants, signed uploads, public URLs, and cleanup |
-| `src/main.ts` | Entry gate, access state, rendering, filters, counts, management behavior, and detail dialog |
+| `src/exhibition-store.ts` | Public/admin exhibition reads, session-protected saves/deletes, and local read fallback |
+| `src/museum-export.ts` | Versioned metadata-only JSON export and browser download helper |
+| `src/main.ts` | Entry gate, catalog facets/sorting, exhibitions, trash/export management, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
 | `src/museum-canvas.ts` | Responsive, reduced-motion-aware archive-dust Canvas background |
 | `src/styles.css` | Academia/Classical visual system and responsive layout |
 | `public/artifacts/` | User-provided `blackMyth.png` used by the remaining bundled artifact |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
-| `supabase/migrations/` | Postgres tables, RLS policies, custom admin account/session RPC, built-in artifact overrides, and Storage compatibility policies |
+| `supabase/migrations/` | Postgres tables, RLS/RPC boundaries, custom admin sessions, catalog metadata, trash, exhibitions, and Storage policies |
 | `supabase/functions/artifact-images/` | Custom-session verification and signed Storage upload/delete operations |
 | `scripts/migrate-artifact-images.mjs` | Dry-run, migration, verification, and Base64 cleanup utility |
 | `scripts/validate-site.mjs` | Dependency-free structural validation |
