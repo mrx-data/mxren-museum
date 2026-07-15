@@ -1,4 +1,5 @@
 export type ArtifactCategory = string;
+export type ArtifactVisibility = "draft" | "published" | "unlisted";
 
 export type Artifact = {
   id: string;
@@ -10,6 +11,7 @@ export type Artifact = {
   medium: string;
   rarity: string;
   featured: boolean;
+  visibility: ArtifactVisibility;
   symbol: string;
   coverAlt: string;
   coverImage: string;
@@ -54,6 +56,7 @@ export const artifacts: Artifact[] = [
     medium: "Game Cover / Myth Archive",
     rarity: "东方神话标本",
     featured: true,
+    visibility: "published",
     symbol: "☄",
     coverAlt: "一张黑神话悟空竖版封面，悟空站在云雾山崖前",
     coverImage: "/artifacts/blackMyth.png",

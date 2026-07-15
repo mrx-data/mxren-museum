@@ -1405,6 +1405,92 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   accent-color: var(--accent);
 }
 
+.visibility-field {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 0;
+  margin: 4px 0 0;
+  border: 0;
+}
+
+.visibility-field legend {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.visibility-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.visibility-options label {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.visibility-options input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.visibility-option-copy {
+  display: grid;
+  min-height: 72px;
+  align-content: center;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid rgba(201, 169, 98, 0.22);
+  border-radius: var(--radius);
+  color: var(--muted-foreground) !important;
+  background:
+    linear-gradient(135deg, rgba(201, 169, 98, 0.05), transparent 42%),
+    rgba(28, 23, 20, 0.42);
+  transition:
+    color 220ms ease-out,
+    border-color 220ms ease-out,
+    background 220ms ease-out,
+    box-shadow 220ms ease-out;
+}
+
+.visibility-option-copy strong {
+  color: var(--foreground);
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.visibility-option-copy small {
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.visibility-options input:checked + .visibility-option-copy {
+  color: var(--accent) !important;
+  border-color: rgba(201, 169, 98, 0.72);
+  background:
+    linear-gradient(135deg, rgba(217, 193, 131, 0.17), transparent 54%),
+    rgba(61, 48, 36, 0.64);
+  box-shadow: inset 0 0 0 1px rgba(201, 169, 98, 0.14);
+}
+
+.visibility-options input:focus-visible + .visibility-option-copy {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .upload-grid {
   grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr);
   align-items: stretch;
@@ -1573,13 +1659,44 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   color: var(--muted-foreground);
 }
 
-.manager-source {
-  display: inline-flex;
+.manager-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 8px;
+}
+
+.manager-source,
+.manager-visibility {
+  display: inline-flex;
   color: var(--accent);
   font-family: var(--font-display);
   font-size: 9px;
   text-transform: uppercase;
+}
+
+.manager-visibility {
+  padding: 3px 7px;
+  border: 1px solid rgba(201, 169, 98, 0.28);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  background: rgba(28, 23, 20, 0.5);
+}
+
+.manager-visibility[data-visibility="published"] {
+  color: #D4B872;
+  border-color: rgba(212, 184, 114, 0.48);
+}
+
+.manager-visibility[data-visibility="draft"] {
+  color: #BDB2A5;
+  border-style: dashed;
+}
+
+.manager-visibility[data-visibility="unlisted"] {
+  color: #E8B4B4;
+  border-color: rgba(139, 38, 53, 0.62);
 }
 
 .manager-readonly {
@@ -1673,6 +1790,73 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 
 .dialog-copy h2 {
   margin-bottom: 20px;
+}
+
+.dialog-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 5px 9px;
+  border: 1px solid rgba(201, 169, 98, 0.34);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 10px;
+  text-transform: uppercase;
+  background: rgba(28, 23, 20, 0.46);
+}
+
+.dialog-visibility small {
+  color: var(--muted-foreground);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dialog-visibility[data-visibility="draft"] {
+  border-style: dashed;
+}
+
+.dialog-visibility[data-visibility="unlisted"] {
+  border-color: rgba(139, 38, 53, 0.62);
+}
+
+.dialog-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 22px;
+  border-top: 1px solid rgba(201, 169, 98, 0.2);
+}
+
+.dialog-share-button {
+  min-width: 138px;
+}
+
+.dialog-unavailable {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  max-width: 560px;
+  min-height: 300px;
+  align-content: center;
+  gap: 16px;
+  padding: 36px;
+  margin: auto;
+  border: 1px solid rgba(201, 169, 98, 0.24);
+  background: rgba(28, 23, 20, 0.42);
+}
+
+.dialog-unavailable h2,
+.dialog-unavailable p {
+  margin: 0;
+}
+
+.dialog-unavailable p:not(.volume-label) {
+  color: var(--muted-foreground);
 }
 
 .artifact-ledger {
@@ -2135,6 +2319,14 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   .auth-form,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .visibility-options {
+    grid-template-columns: 1fr;
+  }
+
+  .visibility-option-copy {
+    min-height: 62px;
   }
 
   .access-gate {

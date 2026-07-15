@@ -43,6 +43,7 @@ function assert(condition, message) {
   "supabase/migrations/20260713010000_artifact_storage_images.sql",
   "supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql",
   "supabase/migrations/20260714020000_museum_categories.sql",
+  "supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql",
   "supabase/functions/artifact-images/index.ts",
   "supabase/config.toml",
   "src/artifact-images.ts",
@@ -73,6 +74,7 @@ const removeLegacySamplesMigration = read("supabase/migrations/20260711010000_re
 const storageImagesMigration = read("supabase/migrations/20260713010000_artifact_storage_images.sql");
 const jpegStorageMigration = read("supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql");
 const museumCategoriesMigration = read("supabase/migrations/20260714020000_museum_categories.sql");
+const artifactVisibilityMigration = read("supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql");
 const artifactImages = read("src/artifact-images.ts");
 const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
@@ -117,6 +119,7 @@ assert(html.includes("<dialog"), "Missing artifact detail dialog");
 assert(html.includes('id="image-lightbox"'), "Missing detail image lightbox");
 assert(html.includes('id="artifact-save-button"'), "Missing artifact save feedback button");
 assert(html.includes('id="artifact-save-error"'), "Missing artifact save error dialog");
+assert(html.includes('name="visibility"'), "Missing artifact visibility controls");
 assert(html.includes("id=\"app\""), "Missing app mount point");
 assert(html.includes("id=\"access-gate\""), "Missing access gate");
 assert(html.includes("id=\"gate-guest-access\""), "Missing gate guest access control");
@@ -173,6 +176,15 @@ assert(css.includes(".access-gate"), "Missing access gate styling");
 assert(css.includes('body[data-access-role="locked"]'), "Missing locked access styling");
 assert(css.includes(".manager-readonly"), "Missing read-only manager badge styling");
 assert(css.includes(".artifact-form[hidden]"), "Missing hidden management form styling");
+assert(css.includes(".visibility-options"), "Missing artifact visibility selector styling");
+assert(css.includes(".dialog-share-actions"), "Missing artifact share action styling");
+assert(main.includes("#artifact/"), "Missing artifact deep-link route");
+assert(main.includes("navigator.share"), "Missing native artifact share flow");
+assert(main.includes("navigator.clipboard"), "Missing artifact link copy fallback");
+assert(main.includes("hiddenSourceIdsForResult"), "Hidden sample overrides must fail closed");
+assert(artifactVisibilityMigration.includes("load_museum_artifacts"), "Missing visibility-aware list RPC");
+assert(artifactVisibilityMigration.includes("load_museum_artifact"), "Missing artifact deep-link RPC");
+assert(artifactVisibilityMigration.includes("revoke select on public.artifacts"), "Artifact table must not remain directly public-readable");
 
 assert(main.includes("addEventListener(\"click\""), "Missing click interaction wiring");
 assert(main.includes("Escape"), "Missing Escape key dialog handling");
@@ -467,8 +479,7 @@ assert(pkg.scripts?.["migrate:artifact-images"], "Missing artifact image migrati
   "remoteId",
   "source_artifact_id",
   "palette: current?.palette",
-  "symbol: current?.symbol",
-  "请先应用内置藏品覆盖 migration"
+  "symbol: current?.symbol"
 ].forEach((pattern) => {
   assert(artifactStore.includes(pattern), `Missing artifact override store pattern: ${pattern}`);
 });

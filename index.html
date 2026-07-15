@@ -227,6 +227,32 @@
                   <input id="artifact-form-featured" name="featured" type="checkbox" />
                   <span>列入精选馆藏</span>
                 </label>
+                <fieldset class="visibility-field">
+                  <legend>陈列状态</legend>
+                  <div class="visibility-options">
+                    <label>
+                      <input name="visibility" type="radio" value="draft" checked />
+                      <span class="visibility-option-copy">
+                        <strong>草稿</strong>
+                        <small>仅管理员可见</small>
+                      </span>
+                    </label>
+                    <label>
+                      <input name="visibility" type="radio" value="published" />
+                      <span class="visibility-option-copy">
+                        <strong>已发布</strong>
+                        <small>进入公开展厅</small>
+                      </span>
+                    </label>
+                    <label>
+                      <input name="visibility" type="radio" value="unlisted" />
+                      <span class="visibility-option-copy">
+                        <strong>非公开</strong>
+                        <small>仅凭链接访问</small>
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
               </div>
 
               <label class="wide-field">

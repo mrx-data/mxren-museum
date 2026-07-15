@@ -23,6 +23,8 @@ npm run migrate:artifact-images -- --dry-run
 - Built-in artifacts can be edited through cloud override rows keyed by `source_artifact_id`; the original TypeScript entries remain as recoverable defaults and are not duplicated in the gallery.
 - Site entry is gated by an access screen. Visitors can click `游客进入` to view the museum; admin users sign in with the custom Supabase-backed admin account table.
 - Guest access is read-only; add/edit/delete controls appear only after a custom admin account in `public.museum_admin_accounts` is verified through Supabase RPC.
+- Artifacts support `draft`, `published`, and `unlisted` visibility. Drafts are admin-only, published artifacts enter public listings, and unlisted artifacts are available only through their stable link.
+- Artifact dialogs use GitHub Pages-compatible `#artifact/{id}` deep links with copy-link and native share actions; refreshing a deep link restores the same detail view after entry.
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, ordered home/featured/collection route entrances, pre-staged scroll reveal, filter refresh, and detail dialog animation.
 - Adaptive Canvas archive-dust atmosphere in `src/museum-canvas.ts`; it pauses when hidden and renders a static low-contrast frame for reduced-motion users.
@@ -31,7 +33,7 @@ npm run migrate:artifact-images -- --dry-run
 
 ## Supabase Persistence
 
-The app uses `@supabase/supabase-js` from the browser with a publishable key. Public metadata and Storage images are readable; metadata writes use SECURITY DEFINER RPC functions. Image writes use short-lived signed upload URLs issued by the `artifact-images` Edge Function after it verifies the same custom admin session.
+The app uses `@supabase/supabase-js` from the browser with a publishable key. Public Storage images remain readable, while artifact metadata is read through visibility-aware SECURITY DEFINER RPC functions instead of direct anonymous table access. Metadata writes use admin-session RPC functions. Image writes use short-lived signed upload URLs issued by the `artifact-images` Edge Function after it verifies the same custom admin session.
 
 Environment variables:
 
@@ -50,8 +52,11 @@ One-time Supabase setup:
 4. Run `supabase/migrations/20260710020000_museum_sample_artifact_overrides.sql`.
 5. Run `supabase/migrations/20260711010000_remove_legacy_sample_artifacts.sql`.
 6. Run `supabase/migrations/20260713010000_artifact_storage_images.sql`.
-7. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
-8. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+7. Run `supabase/migrations/20260714010000_allow_jpeg_storage_variants.sql`.
+8. Run `supabase/migrations/20260714020000_museum_categories.sql`.
+9. Run `supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql`.
+10. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
+11. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 

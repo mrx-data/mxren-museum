@@ -1,4 +1,9 @@
-import { categories as defaultCategories, type Artifact, type ArtifactCategory } from "./collection";
+import {
+  categories as defaultCategories,
+  type Artifact,
+  type ArtifactCategory,
+  type ArtifactVisibility
+} from "./collection";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase-client";
 import {
   artifactStoragePaths,
@@ -37,6 +42,7 @@ export type ArtifactFormInput = {
   medium: string;
   rarity: string;
   featured: boolean;
+  visibility: ArtifactVisibility;
   coverImage?: string;
   coverAlt?: string;
   coverFile?: File | null;
@@ -85,6 +91,7 @@ type ArtifactRow = {
   medium: string | null;
   rarity: string | null;
   featured: boolean | null;
+  visibility: string | null;
   symbol: string | null;
   cover_alt: string | null;
   cover_image: string | null;
@@ -187,6 +194,10 @@ function normalizeText(value: string) {
   return value.trim();
 }
 
+function normalizeVisibility(value: unknown): ArtifactVisibility {
+  return value === "draft" || value === "unlisted" ? value : "published";
+}
+
 function slugify(value: string) {
   const slug = value
     .trim()
@@ -273,6 +284,7 @@ function artifactFromInput(
     medium: normalizeText(input.medium) || "Digital Artifact",
     rarity: normalizeText(input.rarity) || (source === "remote" ? "云端馆藏" : "本地馆藏"),
     featured: input.featured,
+    visibility: normalizeVisibility(input.visibility),
     symbol: options.symbol ?? symbolForCategory(category),
     coverAlt: normalizeText(input.coverAlt ?? "") || `${title} 的藏品封面`,
     coverImage: normalizeText(options.coverImage ?? input.coverImage ?? ""),
@@ -338,6 +350,7 @@ function artifactFromRow(row: ArtifactRow): ManagedArtifact {
     medium: row.medium?.trim() || "Digital Artifact",
     rarity: row.rarity?.trim() || "云端馆藏",
     featured: Boolean(row.featured),
+    visibility: normalizeVisibility(row.visibility),
     symbol: row.symbol?.trim() || symbolForCategory(category),
     coverAlt: row.cover_alt?.trim() || `${title} 的藏品封面`,
     coverImage,
@@ -369,6 +382,7 @@ function rowFromArtifact(artifact: ManagedArtifact) {
     medium: artifact.medium,
     rarity: artifact.rarity,
     featured: artifact.featured,
+    visibility: artifact.visibility,
     symbol: artifact.symbol,
     cover_alt: artifact.coverAlt,
     cover_image: artifact.coverStoragePath ? "" : artifact.coverImage,
@@ -395,7 +409,11 @@ export function loadLocalArtifacts(storage?: Storage): ManagedArtifact[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isManagedArtifact).map((artifact) => ({ ...artifact, source: "local" }));
+    return parsed.filter(isManagedArtifact).map((artifact) => ({
+      ...artifact,
+      visibility: normalizeVisibility(artifact.visibility),
+      source: "local"
+    }));
   } catch {
     return [];
   }
@@ -514,20 +532,60 @@ export async function saveRemoteArtifactCategory(
   return { id: row.id, label: row.label };
 }
 
-export async function loadRemoteArtifacts(): Promise<ManagedArtifact[]> {
+const legacyArtifactSelectFields =
+  "id,source_artifact_id,owner_id,title,category,category_label,volume,year,medium,rarity,featured,symbol,cover_alt,cover_image,cover_storage_path,cover_thumbnail_storage_path,gallery_images,palette,summary,note,updated_at";
+
+export async function loadRemoteArtifacts(session: AdminSession | null = null): Promise<ManagedArtifact[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc("load_museum_artifacts", {
+    input_session_token: session?.token ?? null
+  });
+
+  if (!error) return (data as ArtifactRow[]).map(artifactFromRow);
+
+  // Keep the site readable while the visibility migration is being rolled out.
+  const legacyResult = await supabase
     .from("artifacts")
-    .select(
-      "id,source_artifact_id,owner_id,title,category,category_label,volume,year,medium,rarity,featured,symbol,cover_alt,cover_image,cover_storage_path,cover_thumbnail_storage_path,gallery_images,palette,summary,note,updated_at"
-    )
+    .select(legacyArtifactSelectFields)
     .order("created_at", { ascending: true });
 
-  if (error) throw new Error(error.message);
-  return (data as ArtifactRow[]).map(artifactFromRow);
+  if (legacyResult.error) throw new Error(error.message);
+  return (legacyResult.data as unknown as ArtifactRow[]).map(artifactFromRow);
 }
 
-export async function loadManagedArtifacts(storage?: Storage): Promise<ArtifactLoadResult> {
+export async function loadHiddenSourceArtifactIds(): Promise<string[] | null> {
+  if (!isSupabaseConfigured()) return [];
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("load_museum_hidden_source_artifact_ids");
+  if (error) return null;
+
+  return (data as Array<{ source_artifact_id: string | null }>)
+    .map((row) => row.source_artifact_id?.trim() ?? "")
+    .filter(Boolean);
+}
+
+export async function loadRemoteArtifactById(
+  id: string,
+  session: AdminSession | null = null
+): Promise<ManagedArtifact | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("load_museum_artifact", {
+    input_artifact_id: id,
+    input_session_token: session?.token ?? null
+  });
+
+  if (error) throw new Error(error.message);
+  const row = (data as ArtifactRow[])[0];
+  return row ? artifactFromRow(row) : null;
+}
+
+export async function loadManagedArtifacts(
+  storage?: Storage,
+  session: AdminSession | null = null
+): Promise<ArtifactLoadResult> {
   if (!isSupabaseConfigured()) {
     return {
       artifacts: loadLocalArtifacts(storage),
@@ -538,7 +596,7 @@ export async function loadManagedArtifacts(storage?: Storage): Promise<ArtifactL
 
   try {
     return {
-      artifacts: await loadRemoteArtifacts(),
+      artifacts: await loadRemoteArtifacts(session),
       mode: "supabase",
       message: "supabase cloud storage"
     };
@@ -675,15 +733,6 @@ export async function createRemoteArtifact(
   } = {}
 ): Promise<ManagedArtifact> {
   const supabase = getSupabaseClient();
-  if (options.sourceArtifactId) {
-    const { error: schemaError } = await supabase
-      .from("artifacts")
-      .select("source_artifact_id")
-      .limit(1);
-    if (schemaError) {
-      throw new Error("请先应用内置藏品覆盖 migration，再保存这次修改");
-    }
-  }
   const databaseId = remoteId();
   const displayId = options.sourceArtifactId ?? input.id ?? databaseId;
   const uploaded = await uploadInputImages(databaseId, input, session);

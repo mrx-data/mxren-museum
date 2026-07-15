@@ -1,5 +1,11 @@
 import "./styles.css";
-import { artifacts as sampleArtifacts, categories as defaultCategories, type Artifact, type ArtifactCategory } from "./collection";
+import {
+  artifacts as sampleArtifacts,
+  categories as defaultCategories,
+  type Artifact,
+  type ArtifactCategory,
+  type ArtifactVisibility
+} from "./collection";
 import {
   clearStoredAdminSession,
   createRemoteArtifact,
@@ -8,8 +14,10 @@ import {
   isRemoteAdmin,
   isSupabaseConfigured,
   loadArtifactCategories,
+  loadHiddenSourceArtifactIds,
   loadManagedArtifacts,
   loadLocalArtifacts,
+  loadRemoteArtifactById,
   onRemoteAuthChange,
   queryArtifacts,
   signInRemoteUser,
@@ -41,6 +49,7 @@ type AccessRole = "locked" | "guest" | "admin";
 interface RouteState {
   route: MuseumRoute;
   targetId: string;
+  artifactId?: string;
 }
 
 const routeTitles: Record<MuseumRoute, string> = {
@@ -51,11 +60,18 @@ const routeTitles: Record<MuseumRoute, string> = {
 
 const ACCESS_MODE_STORAGE_KEY = "mxren-museum.access-mode.v1";
 const NEW_CATEGORY_VALUE = "__new_category__";
+const visibilityLabels: Record<ArtifactVisibility, string> = {
+  draft: "草稿",
+  published: "已发布",
+  unlisted: "非公开"
+};
 
 let activeFilter: FilterId = "all";
 let searchQuery = "";
 let dialogClosing = false;
 let managedArtifacts: ManagedArtifact[] = loadLocalArtifacts();
+let hiddenSourceArtifactIds = new Set<string>();
+let linkedArtifact: ManagedArtifact | null = null;
 let artifactCategories: Array<{ id: FilterId; label: string }> = defaultCategories.map((category) => ({ ...category }));
 let persistenceMode: PersistenceMode = isSupabaseConfigured() ? "supabase" : "local";
 let adminSession: Awaited<ReturnType<typeof getRemoteUser>> = null;
@@ -78,6 +94,10 @@ let pendingGalleryFiles: File[] = [];
 let pendingPreviewUrls: string[] = [];
 let activeRouteState: RouteState | null = null;
 let activeHash = "";
+let activeDialogArtifactId = "";
+let artifactReturnHash = "#collection";
+let artifactHistoryEntryCreated = false;
+let deepLinkRequestId = 0;
 let motionRefreshFrame = 0;
 let searchDebounceTimer = 0;
 let renderedAccessRole: AccessRole | null = null;
@@ -95,6 +115,13 @@ const heroStageMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)
 const HERO_STAGE_AUTOPLAY_DELAY = 6800;
 const HERO_STAGE_TRANSITION_DURATION = 860;
 const basePath = ((import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/?$/, "/");
+
+function hiddenSourceIdsForResult(mode: PersistenceMode, hiddenIds: string[] | null) {
+  if (hiddenIds) return new Set(hiddenIds);
+  return mode === "supabase"
+    ? new Set(sampleArtifacts.map((artifact) => artifact.id))
+    : new Set<string>();
+}
 
 const accessGate = document.querySelector<HTMLElement>("#access-gate");
 const gateGuestAccess = document.querySelector<HTMLButtonElement>("#gate-guest-access");
@@ -140,6 +167,9 @@ const artifactFormRarity = document.querySelector<HTMLInputElement>("#artifact-f
 const artifactFormSummary = document.querySelector<HTMLTextAreaElement>("#artifact-form-summary");
 const artifactFormNote = document.querySelector<HTMLTextAreaElement>("#artifact-form-note");
 const artifactFormFeatured = document.querySelector<HTMLInputElement>("#artifact-form-featured");
+const artifactVisibilityInputs = Array.from(
+  document.querySelectorAll<HTMLInputElement>('input[name="visibility"]')
+);
 const artifactCoverUpload = document.querySelector<HTMLInputElement>("#artifact-cover-upload");
 const artifactGalleryUpload = document.querySelector<HTMLInputElement>("#artifact-gallery-upload");
 const artifactCoverPreview = document.querySelector<HTMLElement>("#artifact-cover-preview");
@@ -225,6 +255,19 @@ function isArtifactCategory(value: string): value is ArtifactCategory {
 
 function routeFromHash(hash = window.location.hash): RouteState {
   const target = hash.replace(/^#\/?/, "") || "home";
+  const artifactMatch = target.match(/^artifact\/(.+)$/);
+
+  if (artifactMatch) {
+    let artifactId = artifactMatch[1];
+    try {
+      artifactId = decodeURIComponent(artifactId);
+    } catch {
+      artifactId = "";
+    }
+    const backgroundRoute = activeRouteState?.route ?? "collection";
+    const backgroundTarget = activeRouteState?.targetId ?? "collection";
+    return { route: backgroundRoute, targetId: backgroundTarget, artifactId };
+  }
 
   if (target === "collection") {
     return { route: "collection", targetId: "collection" };
@@ -246,7 +289,11 @@ function normalizedCurrentHash() {
 }
 
 function sameRouteState(first: RouteState | null, second: RouteState) {
-  return first?.route === second.route && first.targetId === second.targetId;
+  return (
+    first?.route === second.route &&
+    first.targetId === second.targetId &&
+    first.artifactId === second.artifactId
+  );
 }
 
 function scheduleMuseumScrollRefresh(skipSection?: HTMLElement) {
@@ -314,10 +361,12 @@ function syncRouteFromHash(shouldScroll = true, shouldRefreshMotion = true) {
   const routeState = routeFromHash(hash);
 
   if (hash === activeHash && sameRouteState(activeRouteState, routeState)) {
+    void syncArtifactDialogForRoute(routeState);
     return;
   }
 
   showRoutePage(routeState, shouldScroll, shouldRefreshMotion, hash);
+  void syncArtifactDialogForRoute(routeState);
 }
 
 function navigateToHash(hash: string) {
@@ -329,25 +378,60 @@ function navigateToHash(hash: string) {
   }
 
   showRoutePage(routeState, true, true, normalizedHash);
+  void syncArtifactDialogForRoute(routeState);
 }
 
-export function mergeArtifacts(samples: Artifact[], managed: ManagedArtifact[]) {
+function artifactHash(id: string) {
+  return `#artifact/${encodeURIComponent(id)}`;
+}
+
+function artifactShareUrl(id: string) {
+  return new URL(`${basePath}${artifactHash(id)}`, window.location.origin).href;
+}
+
+function navigateToArtifact(artifact: Artifact) {
+  artifactReturnHash = normalizedCurrentHash().startsWith("#artifact/") ? "#collection" : normalizedCurrentHash();
+  artifactHistoryEntryCreated = true;
+  const hash = artifactHash(artifact.id);
+  history.pushState({ artifactId: artifact.id }, "", hash);
+  syncRouteFromHash(false, false);
+}
+
+export function mergeArtifacts(
+  samples: Artifact[],
+  managed: ManagedArtifact[],
+  hiddenSourceIds: ReadonlySet<string> = new Set()
+) {
   const managedById = new Map(managed.map((artifact) => [artifact.id, artifact]));
   const sampleIds = new Set(samples.map((artifact) => artifact.id));
   return [
-    ...samples.map((artifact) => managedById.get(artifact.id) ?? artifact),
+    ...samples
+      .filter((artifact) => managedById.has(artifact.id) || !hiddenSourceIds.has(artifact.id))
+      .map((artifact) => managedById.get(artifact.id) ?? artifact),
     ...managed.filter((artifact) => !sampleIds.has(artifact.id) && !artifact.sourceArtifactId)
   ];
 }
 
 function allArtifacts() {
   const categoryLabels = new Map(artifactCategories.map((category) => [category.id, category.label]));
-  return mergeArtifacts(sampleArtifacts, managedArtifacts).map((artifact) => {
+  return mergeArtifacts(sampleArtifacts, managedArtifacts, hiddenSourceArtifactIds).map((artifact) => {
     const currentLabel = categoryLabels.get(artifact.category);
     return currentLabel && currentLabel !== artifact.categoryLabel
       ? { ...artifact, categoryLabel: currentLabel }
       : artifact;
   });
+}
+
+function browsableArtifacts() {
+  return allArtifacts().filter((artifact) => artifact.visibility === "published");
+}
+
+function artifactForDeepLink(id: string) {
+  const artifact =
+    allArtifacts().find((candidate) => candidate.id === id) ??
+    (linkedArtifact?.id === id ? linkedArtifact : null);
+  if (artifact?.visibility === "draft" && accessRole !== "admin") return null;
+  return artifact;
 }
 
 function mergeArtifactCategories(definitions: ArtifactCategoryDefinition[], artifacts: Artifact[]) {
@@ -675,20 +759,42 @@ async function syncRemoteAccess(session: Awaited<ReturnType<typeof getRemoteUser
   }
 }
 
-async function refreshRemoteUser() {
-  await syncRemoteAccess(await getRemoteUser());
+async function reloadManagedArtifactData(session: Awaited<ReturnType<typeof getRemoteUser>>) {
+  const [result, hiddenIds] = await Promise.all([
+    loadManagedArtifacts(undefined, session),
+    loadHiddenSourceArtifactIds()
+  ]);
+  persistenceMode = result.mode;
+  managedArtifacts = result.artifacts;
+  hiddenSourceArtifactIds = hiddenSourceIdsForResult(result.mode, hiddenIds);
+  mergeArtifactCategories(
+    artifactCategories.filter((category): category is ArtifactCategoryDefinition => category.id !== "all"),
+    mergeArtifacts(sampleArtifacts, managedArtifacts, hiddenSourceArtifactIds)
+  );
+  showManagerStatus(result.message, result.error ? "danger" : result.mode === "supabase" ? "success" : "neutral");
+  refreshMuseumView();
+  return result;
 }
 
 async function hydrateManagedArtifacts() {
   showManagerStatus(isSupabaseConfigured() ? "正在连接 Supabase" : "browser-local storage");
-  const [result, loadedCategories] = await Promise.all([loadManagedArtifacts(), loadArtifactCategories()]);
+  const storedSession = await getRemoteUser();
+  const [result, loadedCategories, hiddenIds] = await Promise.all([
+    loadManagedArtifacts(undefined, storedSession),
+    loadArtifactCategories(),
+    loadHiddenSourceArtifactIds()
+  ]);
   persistenceMode = result.mode;
   managedArtifacts = result.artifacts;
-  mergeArtifactCategories(loadedCategories, mergeArtifacts(sampleArtifacts, managedArtifacts));
+  hiddenSourceArtifactIds = hiddenSourceIdsForResult(result.mode, hiddenIds);
+  mergeArtifactCategories(
+    loadedCategories,
+    mergeArtifacts(sampleArtifacts, managedArtifacts, hiddenSourceArtifactIds)
+  );
   renderArtifactCategoryOptions();
   showManagerStatus(result.message, result.error ? "danger" : result.mode === "supabase" ? "success" : "neutral");
   refreshMuseumView();
-  await refreshRemoteUser();
+  await syncRemoteAccess(storedSession);
 }
 
 function appendCoverImage(cover: HTMLElement, artifact: Artifact, useThumbnail = false) {
@@ -707,7 +813,7 @@ function artifactCard(artifact: Artifact, variant: "featured" | "standard", sequ
   button.type = "button";
   button.className = "artifact-button";
   button.setAttribute("aria-label", `打开 ${artifact.title} 的藏品详情`);
-  button.addEventListener("click", () => openArtifactDialog(artifact));
+  button.addEventListener("click", () => navigateToArtifact(artifact));
 
   const cover = document.createElement("div");
   cover.className = "artifact-cover arch-top sepia-reveal";
@@ -844,7 +950,7 @@ function renderHeroStage() {
   window.clearTimeout(heroStageTransitionTimer);
   heroStageAnimating = false;
   heroStageActiveIndex = 0;
-  heroStagedArtifacts = allArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
+  heroStagedArtifacts = browsableArtifacts().filter((artifact) => artifact.featured).slice(0, 4);
   if (heroStagedArtifacts.length === 0) return;
 
   heroStageGallery.replaceChildren(
@@ -855,7 +961,7 @@ function renderHeroStage() {
       button.setAttribute("aria-label", `打开 ${artifact.title} 的藏品详情`);
       button.dataset.stagePosition = String(index);
       setCoverStyle(button, artifact);
-      button.addEventListener("click", () => openArtifactDialog(artifact));
+      button.addEventListener("click", () => navigateToArtifact(artifact));
 
       const source = artifact.coverThumbnailImage ?? artifact.coverImage;
       if (source) {
@@ -872,7 +978,7 @@ function renderHeroStage() {
 function renderCategoryIndex() {
   if (!categoryIndex) return;
 
-  const artifacts = allArtifacts();
+  const artifacts = browsableArtifacts();
   categoryIndex.replaceChildren(
     ...artifactCategories.filter((category) => category.id !== "all").map((category, index) => {
       const count = artifacts.filter((artifact) => artifact.category === category.id).length;
@@ -924,7 +1030,7 @@ export function renderFilters() {
 export function renderCollection(animate = false) {
   if (!collectionGrid) return;
 
-  const artifacts = allArtifacts();
+  const artifacts = browsableArtifacts();
   const artifactOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
   const visibleArtifacts = queryArtifacts(artifacts, searchQuery, activeFilter);
   collectionGrid.replaceChildren(
@@ -935,7 +1041,7 @@ export function renderCollection(animate = false) {
 
 function renderFeatured() {
   if (!featuredGallery) return;
-  const artifacts = allArtifacts();
+  const artifacts = browsableArtifacts();
   const artifactOrder = new Map(artifacts.map((artifact, index) => [artifact.id, index]));
   const featured = artifacts.filter((artifact) => artifact.featured);
   featuredGallery.replaceChildren(
@@ -981,9 +1087,81 @@ function moveImageLightbox(direction: -1 | 1) {
   renderImageLightbox();
 }
 
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.append(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("浏览器未允许复制，请从地址栏复制链接");
+}
+
+function showShareFeedback(button: HTMLButtonElement, message: string) {
+  const originalLabel = button.textContent ?? "";
+  button.textContent = message;
+  window.setTimeout(() => {
+    button.textContent = originalLabel;
+  }, 1800);
+}
+
+function createArtifactShareActions(artifact: Artifact) {
+  const actions = document.createElement("div");
+  actions.className = "dialog-share-actions";
+  actions.setAttribute("aria-label", "藏品分享操作");
+  const url = artifactShareUrl(artifact.id);
+
+  const copyButton = document.createElement("button");
+  copyButton.type = "button";
+  copyButton.className = "button button-secondary dialog-share-button";
+  copyButton.textContent = "复制藏品链接";
+  copyButton.addEventListener("click", async () => {
+    try {
+      await copyText(url);
+      showShareFeedback(copyButton, "链接已复制");
+    } catch (error) {
+      showShareFeedback(copyButton, error instanceof Error ? error.message : "复制失败");
+    }
+  });
+  actions.append(copyButton);
+
+  if (typeof navigator.share === "function") {
+    const shareButton = document.createElement("button");
+    shareButton.type = "button";
+    shareButton.className = "button button-primary dialog-share-button";
+    shareButton.textContent = "分享藏品";
+    shareButton.addEventListener("click", async () => {
+      try {
+        await navigator.share({
+          title: `${artifact.title} | mxren-museum`,
+          text: artifact.summary,
+          url
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        await copyText(url);
+        showShareFeedback(shareButton, "链接已复制");
+      }
+    });
+    actions.append(shareButton);
+  }
+
+  return actions;
+}
+
 export function openArtifactDialog(artifact: Artifact) {
   if (!dialog || !dialogBody) return;
   dialogClosing = false;
+  activeDialogArtifactId = artifact.id;
+  document.title = `${artifact.title} | mxren-museum`;
 
   const cover = document.createElement("div");
   cover.className = "dialog-cover arch-top sepia-reveal";
@@ -996,6 +1174,10 @@ export function openArtifactDialog(artifact: Artifact) {
   const copy = document.createElement("div");
   copy.className = "dialog-copy";
   copy.innerHTML = `
+    <div class="dialog-visibility" data-visibility="${artifact.visibility}">
+      <span>${escapeHtml(visibilityLabels[artifact.visibility])}</span>
+      <small>${artifact.visibility === "unlisted" ? "凭链接访问" : artifact.visibility === "draft" ? "仅管理员可见" : "公开陈列"}</small>
+    </div>
     <p class="volume-label">Volume ${escapeHtml(artifact.volume)}</p>
     <h2 id="dialog-title">${escapeHtml(artifact.title)}</h2>
     <dl class="artifact-ledger">
@@ -1038,9 +1220,10 @@ export function openArtifactDialog(artifact: Artifact) {
     imageStrip.append(plate);
   });
   copy.insertBefore(imageStrip, copy.querySelector(".dialog-summary"));
+  if (artifact.visibility !== "draft") copy.append(createArtifactShareActions(artifact));
 
   dialogBody.replaceChildren(cover, copy);
-  dialog.showModal();
+  if (!dialog.open) dialog.showModal();
   animateArtifactDialog(dialog);
 }
 
@@ -1052,7 +1235,73 @@ export function closeArtifactDialog() {
   animateArtifactDialogClose(dialog, () => {
     dialog.close();
     dialogClosing = false;
+    activeDialogArtifactId = "";
+    document.title = routeTitles[activeRouteState?.route ?? "collection"];
   });
+}
+
+function requestArtifactDialogClose() {
+  if (!normalizedCurrentHash().startsWith("#artifact/")) {
+    closeArtifactDialog();
+    return;
+  }
+
+  if (artifactHistoryEntryCreated) {
+    artifactHistoryEntryCreated = false;
+    history.back();
+    return;
+  }
+
+  history.replaceState({}, "", artifactReturnHash);
+  syncRouteFromHash(false, false);
+}
+
+function openUnavailableArtifactDialog() {
+  if (!dialog || !dialogBody) return;
+  activeDialogArtifactId = "missing";
+  dialogBody.innerHTML = `
+    <div class="dialog-unavailable">
+      <p class="volume-label">Archive notice</p>
+      <h2 id="dialog-title">藏品暂不可见</h2>
+      <p>链接可能已失效，或这件藏品仍处于仅管理员可见的草稿状态。</p>
+      <button class="button button-secondary" type="button" data-close-unavailable>返回馆藏目录</button>
+    </div>
+  `;
+  dialogBody.querySelector<HTMLButtonElement>("[data-close-unavailable]")?.addEventListener("click", requestArtifactDialogClose);
+  if (!dialog.open) dialog.showModal();
+  animateArtifactDialog(dialog);
+}
+
+async function syncArtifactDialogForRoute(routeState: RouteState) {
+  const requestId = ++deepLinkRequestId;
+  if (!routeState.artifactId) {
+    linkedArtifact = null;
+    if (dialog?.open) closeArtifactDialog();
+    return;
+  }
+
+  if (activeDialogArtifactId === routeState.artifactId && dialog?.open) return;
+
+  let artifact = artifactForDeepLink(routeState.artifactId);
+  if (!artifact) {
+    try {
+      const loadedArtifact = await loadRemoteArtifactById(routeState.artifactId, adminSession);
+      if (loadedArtifact) {
+        linkedArtifact = loadedArtifact;
+        artifact = loadedArtifact;
+      }
+    } catch (error) {
+      console.warn("Artifact deep link could not be loaded", error);
+    }
+  }
+
+  if (requestId !== deepLinkRequestId) return;
+  if (!artifact) {
+    openUnavailableArtifactDialog();
+    return;
+  }
+
+  openArtifactDialog(artifact);
 }
 
 function releasePendingPreviewUrls() {
@@ -1150,7 +1399,9 @@ async function handleGateAdminSubmit(event: SubmitEvent) {
   try {
     showGateStatus("正在登录");
     clearStoredAccess();
-    await syncRemoteAccess(await signInRemoteUser(username, password));
+    const session = await signInRemoteUser(username, password);
+    await syncRemoteAccess(session);
+    if (accessRole === "admin") await reloadManagedArtifactData(session);
     if (gateAuthPassword) gateAuthPassword.value = "";
   } catch (error) {
     const detail = error instanceof Error ? error.message : "未知错误";
@@ -1193,6 +1444,7 @@ async function handleGateGuestAccess() {
   isCheckingAdminRole = false;
   storeGuestAccess();
   resetArtifactForm(false);
+  await reloadManagedArtifactData(null);
   showGateStatus("游客已入馆", "success");
   renderAuthState();
 }
@@ -1249,6 +1501,9 @@ function requireManageAccess(action: string) {
 function artifactFormInput(): ArtifactFormInput | null {
   const title = artifactFormTitle?.value.trim() ?? "";
   const category = artifactFormCategory?.value ?? "";
+  const selectedVisibility = artifactVisibilityInputs.find((input) => input.checked)?.value;
+  const visibility: ArtifactVisibility =
+    selectedVisibility === "published" || selectedVisibility === "unlisted" ? selectedVisibility : "draft";
 
   if (!title) {
     showManagerStatus("请输入藏品标题", "danger");
@@ -1271,6 +1526,7 @@ function artifactFormInput(): ArtifactFormInput | null {
     medium: artifactFormMedium?.value.trim() ?? "",
     rarity: artifactFormRarity?.value.trim() ?? "",
     featured: artifactFormFeatured?.checked ?? false,
+    visibility,
     coverImage: pendingCoverImage,
     coverAlt: `${title} 的藏品封面`,
     coverFile: pendingCoverFile,
@@ -1382,6 +1638,9 @@ export function handleArtifactEdit(id: string) {
   if (artifactFormSummary) artifactFormSummary.value = artifact.summary;
   if (artifactFormNote) artifactFormNote.value = artifact.note;
   if (artifactFormFeatured) artifactFormFeatured.checked = artifact.featured;
+  artifactVisibilityInputs.forEach((input) => {
+    input.checked = input.value === artifact.visibility;
+  });
   if (artifactFormHeading) artifactFormHeading.textContent = "修改藏品";
 
   renderUploadPreviews();
@@ -1411,6 +1670,7 @@ export async function handleArtifactDelete(id: string) {
         artifactStoragePaths(artifact)
       );
       managedArtifacts = managedArtifacts.filter((item) => item.id !== id);
+      if (artifact.sourceArtifactId) hiddenSourceArtifactIds.delete(artifact.sourceArtifactId);
     } else {
       showManagerStatus("云端不可用，暂时只能查看藏品", "danger");
       return;
@@ -1431,7 +1691,7 @@ export async function handleArtifactDelete(id: string) {
 function renderManagerList() {
   if (!artifactManagerList) return;
   const canManage = canManageArtifacts();
-  const artifacts = allArtifacts();
+  const artifacts = canManage ? allArtifacts() : browsableArtifacts();
 
   if (artifactManagerListTitle) {
     artifactManagerListTitle.textContent = "全部馆藏";
@@ -1464,12 +1724,26 @@ function renderManagerList() {
           : artifact.source === "local"
             ? "本地回退"
             : "内置藏品";
-      copy.append(title, meta, source);
+      const visibility = document.createElement("span");
+      visibility.className = "manager-visibility";
+      visibility.dataset.visibility = artifact.visibility;
+      visibility.textContent = visibilityLabels[artifact.visibility];
+      const badges = document.createElement("div");
+      badges.className = "manager-badges";
+      badges.append(source, visibility);
+      copy.append(title, meta, badges);
 
       const actions = document.createElement("div");
       actions.className = "manager-actions";
 
       if (canManage) {
+        const previewButton = document.createElement("button");
+        previewButton.type = "button";
+        previewButton.className = "button button-secondary";
+        previewButton.textContent = "预览";
+        previewButton.setAttribute("aria-label", `预览 ${artifact.title}`);
+        previewButton.addEventListener("click", () => navigateToArtifact(artifact));
+
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = "button button-secondary";
@@ -1477,7 +1751,7 @@ function renderManagerList() {
         editButton.setAttribute("aria-label", `修改 ${artifact.title}`);
         editButton.addEventListener("click", () => handleArtifactEdit(artifact.id));
 
-        actions.append(editButton);
+        actions.append(previewButton, editButton);
         if (artifact.source === "remote") {
           const deleteButton = document.createElement("button");
           deleteButton.type = "button";
@@ -1507,17 +1781,17 @@ function renderManagerList() {
 }
 
 function bindDialogEvents() {
-  dialogClose?.addEventListener("click", closeArtifactDialog);
+  dialogClose?.addEventListener("click", requestArtifactDialogClose);
 
   dialog?.addEventListener("click", (event) => {
     if (event.target === dialog) {
-      closeArtifactDialog();
+      requestArtifactDialogClose();
     }
   });
 
   dialog?.addEventListener("cancel", (event) => {
     event.preventDefault();
-    closeArtifactDialog();
+    requestArtifactDialogClose();
   });
 
   imageLightboxClose?.addEventListener("click", () => closeImageLightbox());
@@ -1559,7 +1833,7 @@ function bindDialogEvents() {
     }
 
     if (event.key === "Escape" && dialog?.open) {
-      closeArtifactDialog();
+      requestArtifactDialogClose();
     }
   });
 }
@@ -1644,7 +1918,7 @@ function bindRouteEvents() {
 }
 
 function updateCounts() {
-  if (artifactCount) artifactCount.textContent = String(allArtifacts().length).padStart(2, "0");
+  if (artifactCount) artifactCount.textContent = String(browsableArtifacts().length).padStart(2, "0");
   if (categoryCount) categoryCount.textContent = String(artifactCategories.length - 1).padStart(2, "0");
 }
 
