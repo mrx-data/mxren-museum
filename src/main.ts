@@ -49,6 +49,7 @@ import {
   animateCollectionRefresh,
   animateArtifactDialog,
   animateArtifactDialogClose,
+  animateExhibitionDetail,
   animateMuseumRoute,
   initMuseumMotion,
   playMuseumEntry,
@@ -1310,6 +1311,7 @@ function renderExhibitionDetail(exhibition: MuseumExhibition) {
   const heading = document.createElement("header");
   heading.className = "exhibition-detail-heading corner-flourish";
   heading.innerHTML = `
+    <span class="exhibition-detail-glow" aria-hidden="true"></span>
     <button class="exhibition-back" type="button">← 返回专题目录</button>
     <p class="volume-label">Curatorial dossier</p>
     <div class="dialog-visibility" data-visibility="${exhibition.visibility}">
@@ -1338,6 +1340,7 @@ function renderExhibitionDetail(exhibition: MuseumExhibition) {
     );
   }
   exhibitionDetailView.replaceChildren(heading, sequence);
+  animateExhibitionDetail(exhibitionDetailView);
 }
 
 async function syncExhibitionForRoute(routeState: RouteState) {

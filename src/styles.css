@@ -772,7 +772,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   padding-top: 48px;
 }
 
-.page-section .manager-search {
+.page-section > .manager-search {
   margin-bottom: 18px;
 }
 
@@ -2222,6 +2222,7 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 }
 
 .catalog-tools .manager-search {
+  margin-bottom: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -2462,9 +2463,27 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
 
 .exhibition-detail-heading {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: 42px;
   border: 1px solid rgba(201, 169, 98, 0.28);
   background: linear-gradient(135deg, rgba(201, 169, 98, 0.08), transparent 40%), rgba(28, 23, 20, 0.62);
+}
+
+.exhibition-detail-heading > :not(.exhibition-detail-glow) {
+  position: relative;
+  z-index: 1;
+}
+
+.exhibition-detail-glow {
+  position: absolute;
+  inset: -35% -14%;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(108deg, transparent 35%, rgba(201, 169, 98, 0.12) 48%, rgba(232, 223, 212, 0.06) 54%, transparent 68%);
+  transform: translate3d(-30%, 0, 0);
+  will-change: transform, opacity;
 }
 
 .exhibition-back {
@@ -2950,11 +2969,18 @@ body[data-route="manage"] [data-page]:not([data-page="manage"]) {
   .motion-reveal,
   [data-motion-item],
   [data-motion-image],
-  [data-motion-title] {
+  [data-motion-title],
+  .exhibition-detail,
+  .exhibition-detail-heading,
+  .exhibition-sequence-item {
     opacity: 1 !important;
     transform: none !important;
     clip-path: none !important;
     filter: none !important;
+  }
+
+  .exhibition-detail-glow {
+    display: none;
   }
 
   .museum-atmosphere {

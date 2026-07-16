@@ -254,6 +254,7 @@ assert(main.includes("initMuseumMotion"), "Missing museum motion initialization"
 assert(main.includes("refreshMuseumScrollAnimations"), "Missing collection motion refresh");
 assert(main.includes("animateArtifactDialog"), "Missing dialog opening animation hook");
 assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animation hook");
+assert(main.includes("animateExhibitionDetail"), "Missing exhibition detail reveal hook");
 
 [
   "data-motion-root",
@@ -282,6 +283,7 @@ assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animat
   "refreshMuseumScrollAnimations",
   "animateCollectionRefresh",
   "animateMuseumRoute",
+  "animateExhibitionDetail",
   "animateArtifactDialog",
   "animateArtifactDialogClose",
   "gsap.quickTo",
@@ -297,6 +299,7 @@ assert(exists("src/museum-canvas.ts"), "Missing museum canvas module");
 assert(main.includes("initMuseumCanvas"), "Missing museum canvas initialization");
 assert(css.includes(".museum-dust-canvas"), "Missing museum dust canvas styling");
 assert(css.includes(".museum-pointer-light"), "Missing pointer light styling");
+assert(css.includes(".exhibition-detail-glow"), "Missing exhibition detail reveal glow styling");
 assert(css.includes(".motion-reveal"), "Missing motion reveal styling");
 assert(motion.includes("animation: timeline"), "Scroll reveals must prepare their initial state before playback");
 assert(motion.indexOf("refreshMuseumScrollAnimations();") < motion.lastIndexOf("playMuseumEntry();"), "Museum entry must start after scroll animation reset");

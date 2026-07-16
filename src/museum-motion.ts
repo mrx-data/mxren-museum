@@ -9,6 +9,7 @@ let scrollMotionContext: gsap.Context | null = null;
 let ambientTimeline: gsap.core.Timeline | null = null;
 let entryTimeline: gsap.core.Timeline | null = null;
 let dialogTimeline: gsap.core.Timeline | null = null;
+let exhibitionTimeline: gsap.core.Timeline | null = null;
 let collectionTimeline: gsap.core.Timeline | null = null;
 let routeTimeline: gsap.core.Timeline | null = null;
 let curatorMarkTween: gsap.core.Tween | null = null;
@@ -156,6 +157,8 @@ function handleMotionPreferenceChange() {
   entryTimeline = null;
   dialogTimeline?.kill();
   dialogTimeline = null;
+  exhibitionTimeline?.kill();
+  exhibitionTimeline = null;
 
   if (shouldReduceMotion()) {
     killMuseumScrollAnimations();
@@ -396,6 +399,66 @@ export function animateCollectionRefresh(container: HTMLElement) {
     { autoAlpha: 0, y: 16, scale: 0.992 },
     { autoAlpha: 1, y: 0, scale: 1, duration: 0.46, stagger: 0.045, ease: "power3.out" }
   );
+}
+
+export function animateExhibitionDetail(detail: HTMLElement) {
+  exhibitionTimeline?.kill();
+  exhibitionTimeline = null;
+
+  const heading = detail.querySelector<HTMLElement>(".exhibition-detail-heading");
+  const glow = detail.querySelector<HTMLElement>(".exhibition-detail-glow");
+  const back = detail.querySelector<HTMLElement>(".exhibition-back");
+  const metadata = motionElements<HTMLElement>(
+    ".exhibition-detail-heading > .volume-label, .exhibition-detail-heading > .dialog-visibility",
+    detail
+  );
+  const title = detail.querySelector<HTMLElement>(".exhibition-detail-heading > h2");
+  const copy = motionElements<HTMLElement>(
+    ".exhibition-detail-heading > .exhibition-lede, .exhibition-detail-heading > p:not(.volume-label):not(.exhibition-lede)",
+    detail
+  );
+  const items = motionElements<HTMLElement>(".exhibition-sequence-item, .exhibition-sequence > .exhibition-empty", detail);
+  const numbers = motionElements<HTMLElement>(".exhibition-sequence-number", detail);
+  const covers = motionElements<HTMLElement>(".exhibition-sequence-item .artifact-cover", detail);
+  const animated = [detail, heading, back, ...metadata, title, ...copy, ...items, ...numbers, ...covers]
+    .filter((element): element is HTMLElement => Boolean(element));
+
+  clearMotionProps(animated);
+  if (glow) gsap.set(glow, { clearProps: "opacity,visibility,transform,willChange" });
+  if (shouldReduceMotion() || !heading) return;
+
+  prepareMotionElements(animated);
+  exhibitionTimeline = gsap.timeline({
+    defaults: { ease: "power4.out" },
+    onComplete: () => {
+      clearMotionProps(animated);
+      if (glow) gsap.set(glow, { clearProps: "opacity,visibility,transform,willChange" });
+      exhibitionTimeline = null;
+    }
+  })
+    .fromTo(detail, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 })
+    .fromTo(
+      heading,
+      { autoAlpha: 0, y: 20, filter: "blur(7px)", clipPath: "inset(0 0 9% 0)" },
+      { autoAlpha: 1, y: 0, filter: "blur(0px)", clipPath: "inset(0 0 0% 0)", duration: 0.72 },
+      0.04
+    )
+    .from(back, { autoAlpha: 0, x: 10, duration: 0.42 }, 0.22)
+    .from(metadata, { autoAlpha: 0, y: 10, duration: 0.44, stagger: 0.06 }, 0.28)
+    .from(title, { autoAlpha: 0, y: 24, filter: "blur(4px)", duration: 0.66 }, 0.34)
+    .from(copy, { autoAlpha: 0, y: 16, duration: 0.54, stagger: 0.07 }, 0.48)
+    .from(items, { autoAlpha: 0, y: 30, scale: 0.988, filter: "blur(5px)", duration: 0.7, stagger: 0.09 }, 0.62)
+    .from(covers, { scale: 1.025, duration: 0.78, stagger: 0.09 }, 0.66)
+    .from(numbers, { autoAlpha: 0, y: 8, scale: 0.82, duration: 0.4, stagger: 0.09 }, 0.78);
+
+  if (glow) {
+    exhibitionTimeline.fromTo(
+      glow,
+      { autoAlpha: 0, xPercent: -30 },
+      { keyframes: [{ autoAlpha: 0.5 }, { autoAlpha: 0 }], xPercent: 32, duration: 1.1, ease: "power2.inOut" },
+      0.16
+    );
+  }
 }
 
 export function animateArtifactDialog(dialog: HTMLDialogElement) {
