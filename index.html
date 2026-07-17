@@ -208,6 +208,19 @@
               <button class="button button-secondary" id="auth-sign-out" type="button" hidden>切换身份</button>
             </div>
 
+            <aside id="management-draft-recovery" class="management-draft-recovery" hidden aria-labelledby="management-draft-title">
+              <div>
+                <p class="volume-label">Recovered ledger</p>
+                <h3 id="management-draft-title">发现未保存的编目草稿</h3>
+                <p id="management-draft-message">上次编辑内容仍保存在这台设备中。</p>
+              </div>
+              <div class="management-draft-actions">
+                <button class="button button-primary" id="restore-artifact-draft" type="button" hidden>恢复藏品草稿</button>
+                <button class="button button-secondary" id="restore-exhibition-draft" type="button" hidden>恢复专题草稿</button>
+                <button class="button button-secondary" id="discard-management-drafts" type="button">放弃草稿</button>
+              </div>
+            </aside>
+
             <form id="artifact-form" class="artifact-form" aria-labelledby="artifact-form-heading" hidden>
               <input id="artifact-form-id" name="artifact-form-id" type="hidden" />
               <div class="form-heading">
@@ -343,10 +356,31 @@
                 </div>
                 <div class="manager-ledger-actions">
                   <button class="button button-secondary" id="museum-export-json" type="button" hidden>导出 JSON</button>
+                  <button class="button button-secondary" id="museum-import-json" type="button" hidden>导入与恢复</button>
+                  <input id="museum-import-file" type="file" accept="application/json,.json" hidden />
                   <button class="button button-secondary" id="artifact-trash-toggle" type="button" aria-expanded="false" aria-controls="artifact-trash-panel" hidden>
                     回收站 <span id="artifact-trash-count">0</span>
                   </button>
                 </div>
+              </div>
+              <div id="artifact-batch-toolbar" class="artifact-batch-toolbar" hidden>
+                <label class="artifact-batch-select-all">
+                  <input id="artifact-batch-select-all" type="checkbox" />
+                  <span>选择全部云端藏品</span>
+                </label>
+                <span id="artifact-batch-count">已选择 0 件</span>
+                <select id="artifact-batch-action" aria-label="批量操作">
+                  <option value="">选择批量操作</option>
+                  <option value="visibility:published">设为已发布</option>
+                  <option value="visibility:draft">设为草稿</option>
+                  <option value="visibility:unlisted">设为非公开</option>
+                  <option value="category">修改类别</option>
+                  <option value="tags">替换标签</option>
+                  <option value="trash">移入回收站</option>
+                </select>
+                <select id="artifact-batch-category" aria-label="批量修改类别" hidden></select>
+                <input id="artifact-batch-tags" type="text" maxlength="320" placeholder="逗号分隔，最多 12 个标签" hidden />
+                <button class="button button-secondary" id="artifact-batch-apply" type="button" disabled>应用到所选藏品</button>
               </div>
               <div id="artifact-manager-list" class="manager-list" aria-live="polite"></div>
               <section id="artifact-trash-panel" class="trash-panel" aria-labelledby="artifact-trash-title" hidden>
@@ -399,10 +433,22 @@
                 </fieldset>
                 <fieldset class="exhibition-artifact-field">
                   <legend>专题藏品与顺序</legend>
-                  <p>先勾选藏品，再用上下按钮调整观看顺序。</p>
+                  <p>搜索并勾选藏品；可拖动编排，也可用键盘排序按钮精确调整。</p>
+                  <label class="exhibition-artifact-search" for="exhibition-artifact-search">
+                    <span>搜索藏品</span>
+                    <input id="exhibition-artifact-search" type="search" autocomplete="off" placeholder="标题、类别、标签或年份" />
+                  </label>
                   <div id="exhibition-artifact-options" class="exhibition-artifact-options"></div>
+                  <p id="exhibition-artifact-warning" class="exhibition-artifact-warning" hidden></p>
                   <ol id="exhibition-artifact-order" class="exhibition-artifact-order" aria-live="polite"></ol>
                 </fieldset>
+                <aside class="exhibition-live-preview" aria-labelledby="exhibition-live-preview-title">
+                  <div class="exhibition-live-preview-heading">
+                    <p class="volume-label">Live dossier</p>
+                    <h4 id="exhibition-live-preview-title">专题实时预览</h4>
+                  </div>
+                  <div id="exhibition-live-preview" aria-live="polite"></div>
+                </aside>
                 <div class="form-actions">
                   <button class="button button-primary" id="exhibition-save" type="submit">保存专题</button>
                   <button class="button button-secondary" id="exhibition-reset" type="button">新建专题</button>
@@ -464,6 +510,52 @@
           <div class="save-error-actions">
             <button class="button button-secondary" id="save-error-confirm" type="button">返回修改</button>
           </div>
+        </div>
+      </dialog>
+
+      <dialog id="museum-import-dialog" class="museum-import-dialog" aria-labelledby="museum-import-title">
+        <div class="museum-import-frame corner-flourish-large">
+          <button class="museum-import-close" type="button" aria-label="关闭导入预演">×</button>
+          <p class="volume-label">Archive restoration</p>
+          <h2 id="museum-import-title">导入预演</h2>
+          <p id="museum-import-source" class="museum-import-source"></p>
+          <div id="museum-import-summary" class="museum-import-summary" aria-live="polite"></div>
+          <div id="museum-import-warnings" class="museum-import-warnings" hidden></div>
+          <label class="museum-import-strategy" for="museum-import-strategy">
+            <span>遇到已存在的记录</span>
+            <select id="museum-import-strategy">
+              <option value="skip">保留当前版本，跳过冲突</option>
+              <option value="overwrite">以备份版本覆盖当前记录</option>
+            </select>
+          </label>
+          <p class="museum-import-note">正式恢复前会先执行服务端预演，并自动下载一份当前馆藏备份；任一记录失败时整批回滚。</p>
+          <p id="museum-import-status" class="status-line" aria-live="polite">等待确认</p>
+          <div class="museum-import-actions">
+            <button class="button button-secondary" id="museum-import-cancel" type="button">取消</button>
+            <button class="button button-primary" id="museum-import-apply" type="button">预演并恢复</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="unsaved-changes-dialog" class="unsaved-changes-dialog" aria-labelledby="unsaved-changes-title" aria-describedby="unsaved-changes-message">
+        <div class="unsaved-changes-frame corner-flourish">
+          <p class="volume-label">Unfinished ledger</p>
+          <h2 id="unsaved-changes-title">编目尚未保存</h2>
+          <p id="unsaved-changes-message">离开后草稿仍会保存在这台设备中。</p>
+          <div class="unsaved-changes-actions">
+            <button class="button button-secondary" id="unsaved-changes-stay" type="button">继续编辑</button>
+            <button class="button button-primary" id="unsaved-changes-leave" type="button">保存草稿并离开</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="artifact-history-dialog" class="artifact-history-dialog" aria-labelledby="artifact-history-title">
+        <div class="artifact-history-frame corner-flourish-large">
+          <button class="artifact-history-close" type="button" aria-label="关闭版本历史">×</button>
+          <p class="volume-label">Revision archive</p>
+          <h2 id="artifact-history-title">藏品版本历史</h2>
+          <p id="artifact-history-subtitle" class="artifact-history-subtitle"></p>
+          <div id="artifact-history-list" class="artifact-history-list" aria-live="polite"></div>
         </div>
       </dialog>
     </div>

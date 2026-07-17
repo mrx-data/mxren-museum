@@ -45,11 +45,14 @@ function assert(condition, message) {
   "supabase/migrations/20260714020000_museum_categories.sql",
   "supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql",
   "supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql",
+  "supabase/migrations/20260717010000_import_history_and_bulk.sql",
   "supabase/functions/artifact-images/index.ts",
   "supabase/config.toml",
   "src/artifact-images.ts",
   "src/exhibition-store.ts",
   "src/museum-export.ts",
+  "src/museum-import.ts",
+  "src/museum-drafts.ts",
   "scripts/migrate-artifact-images.mjs",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
@@ -79,9 +82,12 @@ const jpegStorageMigration = read("supabase/migrations/20260714010000_allow_jpeg
 const museumCategoriesMigration = read("supabase/migrations/20260714020000_museum_categories.sql");
 const artifactVisibilityMigration = read("supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql");
 const catalogExhibitionsMigration = read("supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql");
+const importHistoryMigration = read("supabase/migrations/20260717010000_import_history_and_bulk.sql");
 const artifactImages = read("src/artifact-images.ts");
 const exhibitionStore = read("src/exhibition-store.ts");
 const museumExport = read("src/museum-export.ts");
+const museumImport = read("src/museum-import.ts");
+const museumDrafts = read("src/museum-drafts.ts");
 const storageFunction = read("supabase/functions/artifact-images/index.ts");
 const supabaseRunbook = read("docs/supabase-persistence.md");
 
@@ -131,6 +137,13 @@ assert(html.includes('id="artifact-form-date"'), "Missing artifact date input");
 assert(html.includes('id="artifact-sort"'), "Missing artifact sort control");
 assert(html.includes('id="artifact-year-filter"'), "Missing artifact year filter");
 assert(html.includes('id="museum-export-json"'), "Missing JSON export control");
+assert(html.includes('id="museum-import-json"'), "Missing JSON import control");
+assert(html.includes('id="museum-import-dialog"'), "Missing JSON import preview dialog");
+assert(html.includes('id="management-draft-recovery"'), "Missing draft recovery interface");
+assert(html.includes('id="artifact-batch-toolbar"'), "Missing artifact batch toolbar");
+assert(html.includes('id="exhibition-artifact-search"'), "Missing exhibition artifact search");
+assert(html.includes('id="exhibition-live-preview"'), "Missing exhibition live preview");
+assert(html.includes('id="artifact-history-dialog"'), "Missing artifact history dialog");
 assert(html.includes('id="artifact-trash-panel"'), "Missing artifact trash panel");
 assert(html.includes('id="exhibition-form"'), "Missing exhibition management form");
 assert(html.includes('id="exhibition-grid"'), "Missing exhibition public gallery");
@@ -198,6 +211,15 @@ assert(main.includes("navigator.clipboard"), "Missing artifact link copy fallbac
 assert(main.includes("hiddenSourceIdsForResult"), "Hidden sample overrides must fail closed");
 assert(main.includes("renderCatalogFacets"), "Missing catalog tag/date facets");
 assert(main.includes("handleMuseumExport"), "Missing JSON export interaction");
+assert(main.includes("handleMuseumImportApply"), "Missing transactional JSON import interaction");
+assert(main.includes("confirmUnsavedTransition"), "Missing unsaved management navigation guard");
+assert(main.includes("beforeunload"), "Missing refresh protection for management drafts");
+assert(main.includes("handleArtifactBatchApply"), "Missing artifact batch action");
+assert(main.includes("moveExhibitionArtifact"), "Missing exhibition ordering interaction");
+assert(main.includes("updateCatalogStateUrl"), "Missing URL-backed catalog state");
+assert(main.includes("openArtifactHistory"), "Missing artifact history interaction");
+assert(main.includes("createArtifactContinuity"), "Missing continuous artifact navigation");
+assert(main.includes("createArtifactCoverImage"), "Missing responsive artifact cover helper");
 assert(main.includes("handleArtifactRestore"), "Missing trash restore interaction");
 assert(main.includes("handleArtifactPurge"), "Missing trash purge interaction");
 assert(main.includes("renderExhibitions"), "Missing exhibition rendering");
@@ -216,6 +238,13 @@ assert(catalogExhibitionsMigration.includes("load_museum_exhibition"), "Missing 
 assert(exhibitionStore.includes("saveMuseumExhibition"), "Missing exhibition store save helper");
 assert(museumExport.includes("mxren-museum.export.v1"), "Missing versioned museum JSON export format");
 assert(!museumExport.includes("session.token"), "Museum export must not include admin session tokens");
+assert(museumImport.includes("parseMuseumImportText"), "Missing museum import validation");
+assert(museumImport.includes("input_dry_run"), "Museum import must perform a server dry run");
+assert(museumDrafts.includes("mxren-museum.management-drafts.v1"), "Missing versioned management draft storage");
+assert(importHistoryMigration.includes("apply_museum_import"), "Missing transactional museum import RPC");
+assert(importHistoryMigration.includes("museum_artifact_versions"), "Missing artifact version history table");
+assert(importHistoryMigration.includes("batch_update_museum_artifacts"), "Missing batch artifact RPC");
+assert(importHistoryMigration.includes("assert_museum_admin_session"), "New write RPCs must validate admin sessions");
 
 assert(main.includes("addEventListener(\"click\""), "Missing click interaction wiring");
 assert(main.includes("Escape"), "Missing Escape key dialog handling");

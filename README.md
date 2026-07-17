@@ -60,8 +60,9 @@ One-time Supabase setup:
 8. Run `supabase/migrations/20260714020000_museum_categories.sql`.
 9. Run `supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql`.
 10. Run `supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql`.
-11. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
-12. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
+11. Run `supabase/migrations/20260717010000_import_history_and_bulk.sql` to enable transactional JSON restore, revision history, and batch artifact actions.
+12. Deploy `artifact-images` with JWT verification disabled: `supabase functions deploy artifact-images --no-verify-jwt`.
+13. Create or update the admin account in Supabase SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL.
 
 Example admin account insert:
 
@@ -82,7 +83,7 @@ Do not store a filled admin password, `sb_secret_...`, or legacy `service_role` 
 
 ## Browser-Local Management
 
-The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, and deleting user-managed artifacts only for verified admins. Image previews use temporary object URLs; uploads are optimized to WebP where supported, with an automatic JPEG fallback for browsers that cannot encode WebP, and sent directly to Supabase Storage. Gallery files share one signed-upload request, upload as a batch, and roll back together on failure. Detail images open in a full-size keyboard-accessible lightbox. Postgres stores paths and text metadata, not new Base64 payloads.
+The entry screen must be passed before the museum is visible. The `游客进入` path is remembered in the current browser and can view the museum only. The `藏品管理` section supports creating, searching, editing, deleting, batch updates, revision restore, and validated JSON backup recovery only for verified admins. JSON restore performs client validation, a server dry run, an automatic pre-import backup, and one transactional write. Artifact and exhibition forms keep local drafts and guard navigation or refresh while unsaved. Exhibition editing includes search, drag/keyboard ordering, missing-reference warnings, and a live dossier preview. Image previews use temporary object URLs; uploads are optimized to WebP where supported, with an automatic JPEG fallback for browsers that cannot encode WebP, and sent directly to Supabase Storage. Public covers use responsive thumbnail/display sources with lazy loading and priority for the first visible image. Gallery files share one signed-upload request, upload as a batch, and roll back together on failure. Detail images open in a full-size keyboard-accessible lightbox. Postgres stores paths and text metadata, not new Base64 payloads.
 
 If Supabase is not configured or the remote schema is unavailable, the app falls back to reading browser-local managed artifacts. This fallback is limited to the current browser profile and does not sync across devices, users, or browsers. New writes stay disabled until admin access can be verified through Supabase.
 

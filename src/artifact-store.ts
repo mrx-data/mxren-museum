@@ -80,6 +80,23 @@ export type ArtifactLoadResult = {
   error?: Error;
 };
 
+export type ArtifactBatchPatch = {
+  visibility?: ArtifactVisibility;
+  category?: ArtifactCategory;
+  categoryLabel?: string;
+  tags?: string[];
+  trash?: boolean;
+};
+
+export type ArtifactVersion = {
+  id: number;
+  artifactId: string;
+  operation: "update" | "trash" | "restore" | "purge";
+  title: string;
+  visibility: ArtifactVisibility;
+  createdAt: string;
+};
+
 type StoredArtifact = ManagedArtifact;
 
 type ArtifactRow = {
@@ -890,6 +907,58 @@ export async function purgeRemoteArtifact(
     console.warn("Artifact purged, but its images could not be removed", cleanupError);
     return "藏品已彻底删除，但旧图片清理失败，可稍后在 Storage 中清理";
   }
+}
+
+export async function batchUpdateRemoteArtifacts(
+  ids: string[],
+  patch: ArtifactBatchPatch,
+  session: AdminSession
+) {
+  const { data, error } = await getSupabaseClient().rpc("batch_update_museum_artifacts", {
+    input_session_token: session.token,
+    input_artifact_ids: ids,
+    input_patch: {
+      ...patch,
+      tags: patch.tags ? normalizeArtifactTags(patch.tags) : undefined
+    }
+  });
+  if (error) throw new Error(error.message);
+  return (data as ArtifactRow[]).map(artifactFromRow);
+}
+
+export async function loadArtifactVersions(id: string, session: AdminSession): Promise<ArtifactVersion[]> {
+  const { data, error } = await getSupabaseClient().rpc("load_museum_artifact_versions", {
+    input_session_token: session.token,
+    input_artifact_id: id,
+    input_limit: 30
+  });
+  if (error) throw new Error(error.message);
+  return (data as Array<{
+    id: number;
+    artifact_id: string;
+    operation: ArtifactVersion["operation"];
+    snapshot: unknown;
+    created_at: string;
+  }>).map((row) => {
+    const snapshot = isRecord(row.snapshot) ? row.snapshot : {};
+    return {
+      id: row.id,
+      artifactId: row.artifact_id,
+      operation: row.operation,
+      title: typeof snapshot.title === "string" ? snapshot.title : "未命名藏品",
+      visibility: normalizeVisibility(snapshot.visibility),
+      createdAt: row.created_at
+    };
+  });
+}
+
+export async function restoreArtifactVersion(versionId: number, session: AdminSession) {
+  const { data, error } = await getSupabaseClient().rpc("restore_museum_artifact_version", {
+    input_session_token: session.token,
+    input_version_id: versionId
+  });
+  if (error) throw new Error(error.message);
+  return artifactFromRow(data as ArtifactRow);
 }
 
 export function queryArtifacts(

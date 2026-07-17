@@ -24,6 +24,7 @@ function artifactExportRecord(artifact: Artifact) {
     rarity: artifact.rarity,
     featured: artifact.featured,
     visibility: artifact.visibility,
+    symbol: artifact.symbol,
     coverAlt: artifact.coverAlt,
     coverImage: safeImageReference(artifact.coverImage),
     coverStoragePath: artifact.coverStoragePath ?? null,

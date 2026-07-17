@@ -1,6 +1,6 @@
 # Supabase Persistence Runbook
 
-Production status (2026-07-15): migrations through `20260716010000_catalog_trash_and_exhibitions.sql` are applied and pass remote schema lint. The `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
+Production status (2026-07-17): migrations through `20260717010000_import_history_and_bulk.sql` are applied and pass remote schema lint. Transactional JSON restore, revision history, and batch artifact RPCs are active; the revision table uses RLS and is not directly readable by anonymous clients. The `artifact-images` Edge Function is active with `verify_jwt = false`. Historical Base64 images have been migrated to Storage and cleared after a verified private backup.
 
 mxren-museum remains a static GitHub Pages site. Supabase provides the runtime persistence layer for managed artifacts and custom admin login:
 
@@ -33,8 +33,9 @@ mxren-museum remains a static GitHub Pages site. Supabase provides the runtime p
 9. Run `supabase/migrations/20260714020000_museum_categories.sql`.
 10. Run `supabase/migrations/20260715010000_artifact_visibility_and_sharing.sql`.
 11. Run `supabase/migrations/20260716010000_catalog_trash_and_exhibitions.sql`.
-12. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
-13. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
+12. Run `supabase/migrations/20260717010000_import_history_and_bulk.sql`.
+13. Deploy the Edge Function: `supabase functions deploy artifact-images --no-verify-jwt`.
+14. Create or update the admin account from SQL Editor. Replace `<admin-password>` locally before running; do not commit the filled SQL:
 
 ```sql
 set search_path = public, extensions;
@@ -49,7 +50,7 @@ set
   updated_at = now();
 ```
 
-14. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, test all three visibility states, add or rename a category, edit `黑神话：悟空`, create a test artifact, restore it from trash, export JSON, and save a draft exhibition.
+15. In the app, open the site, choose `管理员登录` on the entry gate, sign in with username `admin`, then open `#manage`, test all three visibility states, add or rename a category, edit `黑神话：悟空`, create a test artifact, restore it from trash, export JSON, and save a draft exhibition.
 
 ## Environment
 
