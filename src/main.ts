@@ -69,6 +69,7 @@ import {
   animateArtifactDialog,
   animateArtifactDialogClose,
   animateExhibitionDetail,
+  animateExhibitionIndex,
   animateMuseumRoute,
   initMuseumMotion,
   playMuseumEntry,
@@ -549,7 +550,7 @@ function showRoutePage(routeState: RouteState, shouldScroll = true, shouldRefres
 
   if (needsMotionRefresh) {
     refreshMuseumScrollAnimations(routeSection ?? undefined);
-    if (routeSection) animateMuseumRoute(routeSection);
+    if (routeSection && routeState.route !== "exhibitions") animateMuseumRoute(routeSection);
   }
 }
 
@@ -1717,6 +1718,11 @@ async function syncExhibitionForRoute(routeState: RouteState) {
   if (!routeState.exhibitionId) {
     exhibitionIndexView.hidden = false;
     exhibitionDetailView.hidden = true;
+    requestAnimationFrame(() => {
+      if (!exhibitionIndexView.hidden && !routeFromHash().exhibitionId) {
+        animateExhibitionIndex(exhibitionIndexView);
+      }
+    });
     return;
   }
 

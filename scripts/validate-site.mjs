@@ -284,6 +284,7 @@ assert(main.includes("initMuseumMotion"), "Missing museum motion initialization"
 assert(main.includes("refreshMuseumScrollAnimations"), "Missing collection motion refresh");
 assert(main.includes("animateArtifactDialog"), "Missing dialog opening animation hook");
 assert(main.includes("animateArtifactDialogClose"), "Missing dialog close animation hook");
+assert(main.includes("animateExhibitionIndex"), "Missing exhibition index reveal hook");
 assert(main.includes("animateExhibitionDetail"), "Missing exhibition detail reveal hook");
 
 [
@@ -313,6 +314,7 @@ assert(main.includes("animateExhibitionDetail"), "Missing exhibition detail reve
   "refreshMuseumScrollAnimations",
   "animateCollectionRefresh",
   "animateMuseumRoute",
+  "animateExhibitionIndex",
   "animateExhibitionDetail",
   "animateArtifactDialog",
   "animateArtifactDialogClose",

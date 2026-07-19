@@ -370,7 +370,11 @@ export function refreshMuseumScrollAnimations(skipSection?: HTMLElement) {
 
   scrollMotionContext = gsap.context(() => {
     motionElements<HTMLElement>("[data-motion-section]").forEach((section, index) => {
-      if (section.matches(".site-header") || section === skipSection || isHiddenByRoute(section)) return;
+      if (
+        section.matches(".site-header, .exhibitions-section") ||
+        section === skipSection ||
+        isHiddenByRoute(section)
+      ) return;
       initSectionTimeline(section, index);
     });
 
@@ -399,6 +403,71 @@ export function animateCollectionRefresh(container: HTMLElement) {
     { autoAlpha: 0, y: 16, scale: 0.992 },
     { autoAlpha: 1, y: 0, scale: 1, duration: 0.46, stagger: 0.045, ease: "power3.out" }
   );
+}
+
+export function animateExhibitionIndex(indexView: HTMLElement) {
+  exhibitionTimeline?.kill();
+  exhibitionTimeline = null;
+
+  const heading = indexView.querySelector<HTMLElement>(".section-heading");
+  const volume = heading?.querySelector<HTMLElement>(".volume-label") ?? null;
+  const title = heading?.querySelector<HTMLElement>("[data-motion-title]") ?? null;
+  const lede = heading?.querySelector<HTMLElement>("p:not(.volume-label)") ?? null;
+  const dossiers = motionElements<HTMLElement>(".exhibition-grid > .exhibition-card, .exhibition-grid > .exhibition-empty", indexView);
+  const animated = [volume, title, lede, ...dossiers]
+    .filter((element): element is HTMLElement => Boolean(element));
+
+  clearMotionProps(animated);
+  if (shouldReduceMotion() || !heading || animated.length === 0) return;
+
+  prepareMotionElements(animated);
+  exhibitionTimeline = gsap.timeline({
+    defaults: { ease: "power4.out" },
+    onComplete: () => {
+      clearMotionProps(animated);
+      exhibitionTimeline = null;
+    }
+  });
+
+  if (volume) {
+    exhibitionTimeline.fromTo(
+      volume,
+      { autoAlpha: 0, y: 12 },
+      { autoAlpha: 1, y: 0, duration: 0.42 },
+      0
+    );
+  }
+  if (title) {
+    exhibitionTimeline.fromTo(
+      title,
+      { autoAlpha: 0, y: 28, filter: "blur(6px)", clipPath: "inset(0 0 22% 0)" },
+      { autoAlpha: 1, y: 0, filter: "blur(0px)", clipPath: "inset(0 0 0% 0)", duration: 0.66 },
+      0.08
+    );
+  }
+  if (lede) {
+    exhibitionTimeline.fromTo(
+      lede,
+      { autoAlpha: 0, y: 18, filter: "blur(3px)" },
+      { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.54 },
+      0.24
+    );
+  }
+  if (dossiers.length > 0) {
+    exhibitionTimeline.fromTo(
+      dossiers,
+      { autoAlpha: 0, y: 32, scale: 0.988, filter: "blur(6px)" },
+      {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        filter: "blur(0px)",
+        duration: 0.72,
+        stagger: 0.095
+      },
+      0.4
+    );
+  }
 }
 
 export function animateExhibitionDetail(detail: HTMLElement) {
