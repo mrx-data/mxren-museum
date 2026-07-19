@@ -1247,9 +1247,7 @@ function appendCoverImage(
   if (source) {
     const sizes = cover.classList.contains("dialog-cover")
       ? "(max-width: 980px) 88vw, 42vw"
-      : cover.classList.contains("related-artifact-cover")
-        ? "120px"
-        : "(max-width: 680px) 88vw, (max-width: 980px) 44vw, 30vw";
+      : "(max-width: 680px) 88vw, (max-width: 980px) 44vw, 30vw";
     cover.classList.add("is-image-loading");
     const image = createArtifactCoverImage(artifact, useThumbnail, loading, highPriority, sizes);
     const finish = () => cover.classList.remove("is-image-loading");
@@ -1855,101 +1853,6 @@ function createArtifactShareActions(artifact: Artifact) {
   return actions;
 }
 
-function artifactBrowsingSequence() {
-  const exhibitionMatch = artifactReturnHash.match(/^#exhibition\/(.+)$/);
-  if (exhibitionMatch) {
-    let exhibitionId = exhibitionMatch[1];
-    try {
-      exhibitionId = decodeURIComponent(exhibitionId);
-    } catch {
-      exhibitionId = "";
-    }
-    const exhibition = museumExhibitions.find((item) => item.id === exhibitionId);
-    if (exhibition) return artifactsForExhibition(exhibition);
-  }
-  const available = accessRole === "admin" ? allArtifacts() : browsableArtifacts();
-  if (artifactReturnHash.startsWith("#featured")) return available.filter((artifact) => artifact.featured);
-  if (artifactReturnHash.startsWith("#collection")) {
-    return queryArtifacts(available, searchQuery, activeFilter, {
-      tag: activeTag,
-      year: activeYear,
-      sort: activeSort
-    });
-  }
-  return available;
-}
-
-function switchArtifactDialog(artifact: Artifact) {
-  history.replaceState({ artifactId: artifact.id }, "", artifactHash(artifact.id));
-  syncRouteFromHash(false, false);
-}
-
-function createArtifactContinuity(artifact: Artifact) {
-  const section = document.createElement("section");
-  section.className = "artifact-continuity";
-  section.setAttribute("aria-label", "连续浏览藏品");
-  const sequence = artifactBrowsingSequence();
-  const index = sequence.findIndex((item) => item.id === artifact.id);
-  const previous = index > 0 ? sequence[index - 1] : null;
-  const next = index >= 0 && index < sequence.length - 1 ? sequence[index + 1] : null;
-
-  const previousButton = document.createElement("button");
-  previousButton.type = "button";
-  previousButton.className = "artifact-continuity-button is-previous";
-  previousButton.disabled = !previous;
-  previousButton.innerHTML = previous
-    ? `<span>← 上一件</span><strong>${escapeHtml(previous.title)}</strong>`
-    : "<span>← 上一件</span><strong>已到序列起点</strong>";
-  if (previous) previousButton.addEventListener("click", () => switchArtifactDialog(previous));
-
-  const nextButton = document.createElement("button");
-  nextButton.type = "button";
-  nextButton.className = "artifact-continuity-button is-next";
-  nextButton.disabled = !next;
-  nextButton.innerHTML = next
-    ? `<span>下一件 →</span><strong>${escapeHtml(next.title)}</strong>`
-    : "<span>下一件 →</span><strong>已到序列终点</strong>";
-  if (next) nextButton.addEventListener("click", () => switchArtifactDialog(next));
-  section.append(previousButton, nextButton);
-  return section;
-}
-
-function createRelatedArtifacts(artifact: Artifact) {
-  const related = (accessRole === "admin" ? allArtifacts() : browsableArtifacts())
-    .filter((candidate) => candidate.id !== artifact.id)
-    .map((candidate) => ({
-      artifact: candidate,
-      score:
-        (candidate.category === artifact.category ? 3 : 0) +
-        candidate.tags.filter((tag) => artifact.tags.includes(tag)).length * 2 +
-        (candidate.year === artifact.year ? 1 : 0)
-    }))
-    .filter((item) => item.score > 0)
-    .sort((first, second) => second.score - first.score)
-    .slice(0, 3);
-  if (!related.length) return null;
-  const section = document.createElement("section");
-  section.className = "related-artifacts";
-  section.innerHTML = '<p class="volume-label">Related records</p><h3>继续细赏</h3>';
-  const list = document.createElement("div");
-  related.forEach(({ artifact: candidate }) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "related-artifact-button";
-    const cover = document.createElement("span");
-    cover.className = "related-artifact-cover";
-    setCoverStyle(cover, candidate);
-    appendCoverImage(cover, candidate, true);
-    const label = document.createElement("span");
-    label.innerHTML = `<strong>${escapeHtml(candidate.title)}</strong><small>${escapeHtml(candidate.categoryLabel)} · ${escapeHtml(candidate.year)}</small>`;
-    button.append(cover, label);
-    button.addEventListener("click", () => switchArtifactDialog(candidate));
-    list.append(button);
-  });
-  section.append(list);
-  return section;
-}
-
 export function openArtifactDialog(artifact: Artifact) {
   if (!dialog || !dialogBody) return;
   dialogClosing = false;
@@ -2014,9 +1917,6 @@ export function openArtifactDialog(artifact: Artifact) {
     imageStrip.append(plate);
   });
   copy.insertBefore(imageStrip, copy.querySelector(".dialog-summary"));
-  copy.append(createArtifactContinuity(artifact));
-  const relatedArtifacts = createRelatedArtifacts(artifact);
-  if (relatedArtifacts) copy.append(relatedArtifacts);
   if (artifact.visibility !== "draft") copy.append(createArtifactShareActions(artifact));
 
   dialogBody.replaceChildren(cover, copy);
@@ -3402,17 +3302,6 @@ function bindDialogEvents() {
 
     if (event.key === "Escape" && dialog?.open) {
       requestArtifactDialogClose();
-      return;
-    }
-
-    if (dialog?.open && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
-      const sequence = artifactBrowsingSequence();
-      const index = sequence.findIndex((artifact) => artifact.id === activeDialogArtifactId);
-      const target = event.key === "ArrowLeft" ? sequence[index - 1] : sequence[index + 1];
-      if (target) {
-        event.preventDefault();
-        switchArtifactDialog(target);
-      }
     }
   });
 }

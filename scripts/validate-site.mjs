@@ -218,7 +218,8 @@ assert(main.includes("handleArtifactBatchApply"), "Missing artifact batch action
 assert(main.includes("moveExhibitionArtifact"), "Missing exhibition ordering interaction");
 assert(main.includes("updateCatalogStateUrl"), "Missing URL-backed catalog state");
 assert(main.includes("openArtifactHistory"), "Missing artifact history interaction");
-assert(main.includes("createArtifactContinuity"), "Missing continuous artifact navigation");
+assert(!main.includes("createArtifactContinuity"), "Artifact detail should remain focused on the current collection item");
+assert(!main.includes("继续细赏"), "Artifact detail should not render related-item distractions");
 assert(main.includes("createArtifactCoverImage"), "Missing responsive artifact cover helper");
 assert(main.includes("handleArtifactRestore"), "Missing trash restore interaction");
 assert(main.includes("handleArtifactPurge"), "Missing trash purge interaction");
