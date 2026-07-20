@@ -1,0 +1,604 @@
+:root {
+  --background-rgb: 28 23 20;
+  --background-alt-rgb: 37 30 25;
+  --foreground-rgb: 232 223 212;
+  --accent-rgb: 201 169 98;
+  --secondary-rgb: 139 38 53;
+  --border-rgb: 74 63 53;
+  --accent-bright-rgb: 212 184 114;
+  --theme-shadow: 0 0 0;
+}
+
+:root[data-theme="scroll"] {
+  color-scheme: light;
+  --background: #D8CFB5;
+  --background-alt: #E6DDC4;
+  --foreground: #20231F;
+  --muted: #C1B593;
+  --muted-foreground: #5F6156;
+  --accent: #78613B;
+  --accent-secondary: #A64232;
+  --border: #9A8B68;
+  --brass-gradient: linear-gradient(180deg, #4F7168 0%, #36584F 52%, #263D37 100%);
+  --background-rgb: 216 207 181;
+  --background-alt-rgb: 230 221 196;
+  --foreground-rgb: 32 35 31;
+  --accent-rgb: 120 97 59;
+  --secondary-rgb: 166 66 50;
+  --border-rgb: 154 139 104;
+  --accent-bright-rgb: 138 114 71;
+  --theme-shadow: 53 47 37;
+  --radius: 2px;
+  --font-heading: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  --font-body: "FangSong", "STFangsong", "Noto Serif CJK SC", serif;
+  --font-display: "Cinzel", "Songti SC", serif;
+}
+
+:root[data-theme="observatory"] {
+  color-scheme: dark;
+  --background: #071018;
+  --background-alt: #0D1922;
+  --foreground: #CFD8D8;
+  --muted: #1B2C34;
+  --muted-foreground: #82969A;
+  --accent: #6DA9A3;
+  --accent-secondary: #C99A4B;
+  --border: #29414B;
+  --brass-gradient: linear-gradient(180deg, #A8C6C4 0%, #6DA9A3 52%, #4B7E7A 100%);
+  --background-rgb: 7 16 24;
+  --background-alt-rgb: 13 25 34;
+  --foreground-rgb: 207 216 216;
+  --accent-rgb: 109 169 163;
+  --secondary-rgb: 201 154 75;
+  --border-rgb: 41 65 75;
+  --accent-bright-rgb: 168 198 196;
+  --theme-shadow: 0 5 12;
+  --radius: 2px;
+  --font-heading: "Cormorant Garamond", "Songti SC", serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "IBM Plex Mono", monospace;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.theme-picker {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 142px;
+  min-height: 46px;
+  padding: 6px 9px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
+  border-radius: var(--radius);
+  color: var(--accent);
+  background: rgb(var(--background-rgb) / 0.42);
+  transition: border-color 260ms ease, background 260ms ease, box-shadow 260ms ease;
+}
+
+.theme-picker:focus-within,
+.theme-picker:hover {
+  border-color: rgb(var(--accent-rgb) / 0.68);
+  background: rgb(var(--background-alt-rgb) / 0.74);
+  box-shadow: 0 8px 24px rgb(var(--theme-shadow) / 0.18);
+}
+
+.theme-picker-mark {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.theme-picker-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.theme-picker-copy small {
+  color: var(--muted-foreground);
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.theme-picker select {
+  width: 100%;
+  min-width: 0;
+  padding: 0 16px 0 0;
+  border: 0;
+  outline: 0;
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+  background: transparent;
+}
+
+.theme-picker select option {
+  color: var(--foreground);
+  background: var(--background-alt);
+}
+
+.theme-transitioning body,
+.theme-transitioning .site-header,
+.theme-transitioning .hero-section,
+.theme-transitioning .artifact-card,
+.theme-transitioning .exhibition-card,
+.theme-transitioning .management-panel,
+.theme-transitioning .artifact-dialog,
+.theme-transitioning .theme-picker {
+  transition:
+    color 460ms ease,
+    background-color 460ms ease,
+    border-color 460ms ease,
+    box-shadow 460ms ease,
+    filter 460ms ease;
+}
+
+/* 丹青卷宗：不是普通浅色模式，而是一套绢本、矿物色与朱砂藏印构成的画卷。 */
+:root[data-theme="scroll"] body {
+  background:
+    radial-gradient(circle at 16% 4%, rgb(255 250 226 / 0.7), transparent 30rem),
+    radial-gradient(circle at 88% 42%, rgb(66 107 102 / 0.09), transparent 28rem),
+    linear-gradient(180deg, #D8CFB5 0%, #E4DAC0 48%, #D1C5A6 100%);
+}
+
+:root[data-theme="scroll"] body::before {
+  opacity: 0.58;
+  background:
+    repeating-linear-gradient(0deg, rgb(71 66 52 / 0.045) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(91deg, rgb(255 252 228 / 0.1) 0 1px, transparent 1px 13px);
+  background-size: auto;
+}
+
+:root[data-theme="scroll"] .paper-texture {
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme="scroll"] .vignette {
+  background: radial-gradient(ellipse at center, transparent 0%, transparent 56%, rgb(72 58 39 / 0.18) 100%);
+}
+
+:root[data-theme="scroll"] .museum-atmosphere {
+  opacity: 0.64;
+  background:
+    linear-gradient(115deg, rgb(255 252 228 / 0.18), transparent 42%, rgb(66 107 102 / 0.07));
+}
+
+:root[data-theme="scroll"] .museum-dust-canvas {
+  opacity: 0.48;
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme="scroll"] .site-header {
+  border-color: rgb(var(--border-rgb) / 0.58);
+  background:
+    linear-gradient(135deg, rgb(255 252 228 / 0.5), transparent 42%),
+    rgb(var(--background-alt-rgb) / 0.88);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.42),
+    0 16px 42px rgb(var(--theme-shadow) / 0.2);
+  backdrop-filter: blur(18px) saturate(90%);
+}
+
+:root[data-theme="scroll"] .brand-sigil {
+  border-radius: 2px;
+  color: #F2E8CC;
+  background:
+    linear-gradient(145deg, rgb(255 236 210 / 0.18), transparent 46%),
+    #A64232;
+  border-color: #7B2E25;
+  box-shadow: inset 0 0 0 4px rgb(91 31 25 / 0.16), 0 6px 15px rgb(var(--theme-shadow) / 0.18);
+}
+
+:root[data-theme="scroll"] .theme-picker-mark {
+  border-radius: 2px;
+  color: #F4E9CE;
+  border-color: #8F362B;
+  background: #A64232;
+}
+
+:root[data-theme="scroll"] .access-gate {
+  background:
+    linear-gradient(135deg, rgb(255 251 224 / 0.46), transparent 38%),
+    linear-gradient(180deg, rgb(var(--background-alt-rgb) / 0.96), rgb(var(--background-rgb) / 0.98));
+}
+
+:root[data-theme="scroll"] .access-gate-panel,
+:root[data-theme="scroll"] .hero-section,
+:root[data-theme="scroll"] .curator-notes {
+  background:
+    linear-gradient(135deg, rgb(255 252 229 / 0.42), transparent 36%),
+    repeating-linear-gradient(0deg, rgb(74 66 46 / 0.025) 0 1px, transparent 1px 6px),
+    rgb(var(--background-alt-rgb) / 0.78);
+  box-shadow: 0 22px 62px rgb(var(--theme-shadow) / 0.16);
+}
+
+:root[data-theme="scroll"] .hero-section::after {
+  right: 5%;
+  bottom: -112px;
+  width: 270px;
+  height: 270px;
+  border: 0;
+  border-radius: 42% 58% 48% 52%;
+  background: radial-gradient(circle, rgb(49 64 56 / 0.14), rgb(49 64 56 / 0.045) 42%, transparent 68%);
+  filter: blur(2px);
+}
+
+:root[data-theme="scroll"] .arch-top {
+  border-radius: 2px;
+}
+
+:root[data-theme="scroll"] .sepia-reveal {
+  filter: sepia(0.24) saturate(0.78) contrast(0.98) brightness(0.97);
+}
+
+:root[data-theme="scroll"] .sepia-reveal:hover,
+:root[data-theme="scroll"] .artifact-button:hover .sepia-reveal {
+  filter: sepia(0.04) saturate(0.94) contrast(1.01) brightness(1.02);
+}
+
+:root[data-theme="scroll"] .artifact-card,
+:root[data-theme="scroll"] .exhibition-card,
+:root[data-theme="scroll"] .management-panel,
+:root[data-theme="scroll"] .manager-search,
+:root[data-theme="scroll"] .auth-panel,
+:root[data-theme="scroll"] .artifact-form,
+:root[data-theme="scroll"] .manager-list-wrap,
+:root[data-theme="scroll"] .exhibition-manager,
+:root[data-theme="scroll"] .catalog-tools {
+  border-color: rgb(var(--border-rgb) / 0.58);
+  background:
+    repeating-linear-gradient(0deg, rgb(73 65 46 / 0.022) 0 1px, transparent 1px 7px),
+    rgb(var(--background-alt-rgb) / 0.72);
+  box-shadow: 0 12px 34px rgb(var(--theme-shadow) / 0.1);
+}
+
+:root[data-theme="scroll"] .artifact-card:hover {
+  border-color: rgb(var(--accent-rgb) / 0.78);
+  box-shadow: 0 13px 34px rgb(var(--theme-shadow) / 0.2);
+}
+
+:root[data-theme="scroll"] .artifact-cover,
+:root[data-theme="scroll"] .dialog-cover,
+:root[data-theme="scroll"] .exhibition-card-cover {
+  border-color: rgb(var(--border-rgb) / 0.72);
+  box-shadow: inset 0 0 0 7px rgb(var(--background-alt-rgb) / 0.28);
+}
+
+:root[data-theme="scroll"] .artifact-cover::after,
+:root[data-theme="scroll"] .dialog-cover::after {
+  background:
+    linear-gradient(90deg, rgb(216 207 181 / 0.1), transparent 12%, transparent 88%, rgb(216 207 181 / 0.12)),
+    linear-gradient(180deg, transparent 62%, rgb(32 35 31 / 0.12));
+}
+
+:root[data-theme="scroll"] .artifact-cover::before,
+:root[data-theme="scroll"] .dialog-cover::before,
+:root[data-theme="scroll"] .cabinet-plate::before {
+  background: linear-gradient(112deg, transparent 0%, rgb(255 250 226 / 0.26) 48%, transparent 64%);
+}
+
+:root[data-theme="scroll"] .curator-mark {
+  width: 60px;
+  height: 60px;
+  padding: 9px 7px 7px;
+  color: #F2E5C6;
+  border-color: #7C2E25;
+  border-radius: 1px;
+  clip-path: polygon(0 8%, 8% 0, 92% 0, 100% 8%, 100% 92%, 92% 100%, 8% 100%, 0 92%);
+  background:
+    linear-gradient(145deg, rgb(255 228 199 / 0.16), transparent 42%),
+    #A64232;
+  box-shadow: inset 0 0 0 4px rgb(91 31 25 / 0.15), 0 7px 18px rgb(var(--theme-shadow) / 0.24);
+}
+
+:root[data-theme="scroll"] .curator-mark::before,
+:root[data-theme="scroll"] .curator-mark-label {
+  border-color: rgb(244 233 205 / 0.42);
+}
+
+:root[data-theme="scroll"] .curator-mark-monogram {
+  font-family: "Songti SC", "STSong", serif;
+  text-shadow: none;
+}
+
+:root[data-theme="scroll"] .ornate-divider::before {
+  content: "印";
+  color: #A64232;
+}
+
+:root[data-theme="scroll"] .cabinet-plate,
+:root[data-theme="scroll"] .exhibition-card-covers {
+  background:
+    radial-gradient(circle at 50% 34%, rgb(255 250 226 / 0.36), transparent 8rem),
+    linear-gradient(145deg, #B8A982, #D8CFB5 50%, #657D70 120%);
+}
+
+:root[data-theme="scroll"] input,
+:root[data-theme="scroll"] select,
+:root[data-theme="scroll"] textarea,
+:root[data-theme="scroll"] .visibility-option-copy,
+:root[data-theme="scroll"] .status-line,
+:root[data-theme="scroll"] .dialog-visibility,
+:root[data-theme="scroll"] .tag-filter-button,
+:root[data-theme="scroll"] .artifact-tags span,
+:root[data-theme="scroll"] .dialog-tags span {
+  background-color: rgb(var(--background-alt-rgb) / 0.78);
+}
+
+:root[data-theme="scroll"] .status-line[data-tone="success"],
+:root[data-theme="scroll"] .manager-visibility[data-visibility="published"] {
+  color: #46685F;
+}
+
+:root[data-theme="scroll"] .status-line[data-tone="danger"],
+:root[data-theme="scroll"] .manager-visibility[data-visibility="unlisted"] {
+  color: #8D3028;
+}
+
+:root[data-theme="scroll"] .artifact-dialog,
+:root[data-theme="scroll"] .museum-import-dialog,
+:root[data-theme="scroll"] .artifact-history-dialog,
+:root[data-theme="scroll"] .unsaved-changes-dialog {
+  color: var(--foreground);
+  background: var(--background-alt);
+}
+
+:root[data-theme="scroll"] .save-error-frame {
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at 50% 0, rgb(var(--secondary-rgb) / 0.12), transparent 44%),
+    var(--background-alt);
+}
+
+/* 极夜观测所：冷银玻璃、坐标网格和低亮度星图，避免通用霓虹赛博风。 */
+:root[data-theme="observatory"] body {
+  background:
+    radial-gradient(circle at 76% 4%, rgb(109 169 163 / 0.12), transparent 30rem),
+    radial-gradient(circle at 14% 54%, rgb(100 90 120 / 0.09), transparent 32rem),
+    linear-gradient(180deg, #071018 0%, #0B1720 52%, #071018 100%);
+}
+
+:root[data-theme="observatory"] body::before {
+  opacity: 0.72;
+  background:
+    linear-gradient(rgb(109 169 163 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(109 169 163 / 0.04) 1px, transparent 1px),
+    radial-gradient(circle, rgb(207 216 216 / 0.11) 0 1px, transparent 1.4px);
+  background-size: 96px 96px, 96px 96px, 48px 48px;
+}
+
+:root[data-theme="observatory"] .paper-texture {
+  opacity: 0.018;
+  mix-blend-mode: screen;
+}
+
+:root[data-theme="observatory"] .vignette {
+  background: radial-gradient(ellipse at center, transparent 0%, transparent 46%, rgb(0 4 8 / 0.76) 100%);
+}
+
+:root[data-theme="observatory"] .museum-atmosphere {
+  opacity: 0.9;
+  background: linear-gradient(118deg, rgb(207 216 216 / 0.02), transparent 42%, rgb(109 169 163 / 0.055));
+}
+
+:root[data-theme="observatory"] .museum-dust-canvas {
+  opacity: 0.82;
+  mix-blend-mode: screen;
+}
+
+:root[data-theme="observatory"] .site-header {
+  border-color: rgb(var(--accent-rgb) / 0.34);
+  background:
+    linear-gradient(135deg, rgb(var(--foreground-rgb) / 0.045), transparent 42%),
+    rgb(var(--background-rgb) / 0.8);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--foreground-rgb) / 0.07),
+    0 18px 52px rgb(0 5 12 / 0.48);
+  backdrop-filter: blur(20px) saturate(118%);
+}
+
+:root[data-theme="observatory"] .brand-sigil,
+:root[data-theme="observatory"] .theme-picker-mark {
+  border-radius: 50%;
+  color: var(--accent);
+  border-color: rgb(var(--accent-rgb) / 0.6);
+  background:
+    radial-gradient(circle, rgb(var(--accent-rgb) / 0.16), transparent 58%),
+    #09151D;
+  box-shadow: inset 0 0 0 3px rgb(var(--accent-rgb) / 0.05), 0 0 24px rgb(var(--accent-rgb) / 0.11);
+}
+
+:root[data-theme="observatory"] .hero-section {
+  background:
+    linear-gradient(135deg, rgb(var(--background-alt-rgb) / 0.9), rgb(var(--background-rgb) / 0.76)),
+    radial-gradient(circle at 84% 14%, rgb(var(--accent-rgb) / 0.16), transparent 18rem);
+  box-shadow: inset 0 0 70px rgb(var(--accent-rgb) / 0.025);
+}
+
+:root[data-theme="observatory"] .hero-section::after {
+  right: 6%;
+  bottom: -96px;
+  width: 250px;
+  height: 250px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.22);
+  box-shadow: inset 0 0 0 22px rgb(var(--accent-rgb) / 0.018), 0 0 0 34px rgb(var(--accent-rgb) / 0.025);
+}
+
+:root[data-theme="observatory"] .arch-top {
+  border-radius: 48% 48% 3px 3px / 17% 17% 3px 3px;
+}
+
+:root[data-theme="observatory"] .sepia-reveal {
+  filter: saturate(0.68) contrast(1.08) brightness(0.9);
+}
+
+:root[data-theme="observatory"] .sepia-reveal:hover,
+:root[data-theme="observatory"] .artifact-button:hover .sepia-reveal {
+  filter: saturate(0.92) contrast(1.06) brightness(1.02);
+}
+
+:root[data-theme="observatory"] .artifact-card,
+:root[data-theme="observatory"] .exhibition-card,
+:root[data-theme="observatory"] .management-panel,
+:root[data-theme="observatory"] .manager-search,
+:root[data-theme="observatory"] .auth-panel,
+:root[data-theme="observatory"] .artifact-form,
+:root[data-theme="observatory"] .manager-list-wrap,
+:root[data-theme="observatory"] .exhibition-manager,
+:root[data-theme="observatory"] .catalog-tools {
+  border-color: rgb(var(--border-rgb) / 0.72);
+  background:
+    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.035), transparent 46%),
+    rgb(var(--background-alt-rgb) / 0.66);
+  box-shadow: 0 18px 52px rgb(0 5 12 / 0.24);
+}
+
+:root[data-theme="observatory"] .artifact-card:hover,
+:root[data-theme="observatory"] .exhibition-card:hover {
+  border-color: rgb(var(--accent-rgb) / 0.68);
+  box-shadow: 0 16px 42px rgb(var(--accent-rgb) / 0.1), 0 20px 54px rgb(0 5 12 / 0.34);
+}
+
+:root[data-theme="observatory"] .artifact-cover::after,
+:root[data-theme="observatory"] .dialog-cover::after {
+  background:
+    linear-gradient(90deg, transparent 49.8%, rgb(var(--accent-rgb) / 0.12) 50%, transparent 50.2%),
+    linear-gradient(180deg, transparent 49.8%, rgb(var(--accent-rgb) / 0.1) 50%, transparent 50.2%),
+    radial-gradient(circle at 50% 50%, transparent 0 33%, rgb(var(--accent-rgb) / 0.1) 33.4%, transparent 34% 100%),
+    linear-gradient(180deg, transparent 62%, rgb(var(--background-rgb) / 0.28));
+}
+
+:root[data-theme="observatory"] .artifact-cover::before,
+:root[data-theme="observatory"] .dialog-cover::before,
+:root[data-theme="observatory"] .cabinet-plate::before {
+  background: linear-gradient(112deg, transparent 0%, rgb(var(--accent-rgb) / 0.28) 49%, transparent 61%);
+}
+
+:root[data-theme="observatory"] .cabinet-plate,
+:root[data-theme="observatory"] .exhibition-card-covers {
+  background:
+    radial-gradient(circle at 50% 34%, rgb(var(--accent-rgb) / 0.17), transparent 7rem),
+    linear-gradient(145deg, #050B11, #102832 52%, #365B60 120%);
+}
+
+:root[data-theme="observatory"] .curator-mark {
+  width: 62px;
+  height: 62px;
+  padding: 9px 7px 8px;
+  color: #B7D3D0;
+  border-color: rgb(var(--accent-rgb) / 0.74);
+  clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%);
+  background:
+    radial-gradient(circle, rgb(var(--accent-rgb) / 0.12), transparent 58%),
+    linear-gradient(180deg, #10242D, #071018);
+  box-shadow: inset 0 0 0 4px rgb(var(--accent-rgb) / 0.045), 0 0 24px rgb(var(--accent-rgb) / 0.15);
+}
+
+:root[data-theme="observatory"] .curator-mark::before,
+:root[data-theme="observatory"] .curator-mark-label {
+  border-color: rgb(var(--accent-rgb) / 0.36);
+}
+
+:root[data-theme="observatory"] .curator-mark-monogram {
+  font-family: "IBM Plex Mono", monospace;
+  text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.32);
+}
+
+:root[data-theme="observatory"] .ornate-divider::before {
+  content: "✦";
+  text-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.42);
+}
+
+:root[data-theme="observatory"] .exhibition-detail-heading,
+:root[data-theme="observatory"] .image-lightbox,
+:root[data-theme="observatory"] .artifact-dialog {
+  box-shadow: inset 0 0 48px rgb(var(--accent-rgb) / 0.025), 0 28px 86px rgb(0 5 12 / 0.5);
+}
+
+:root[data-theme="observatory"] input,
+:root[data-theme="observatory"] select,
+:root[data-theme="observatory"] textarea {
+  caret-color: var(--accent);
+}
+
+@media (max-width: 1120px) {
+  .site-header {
+    gap: 12px;
+  }
+
+  .site-nav {
+    gap: 4px;
+  }
+
+  .site-nav a {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .theme-picker {
+    min-width: 124px;
+  }
+}
+
+@media (max-width: 680px) {
+  .brand-mark {
+    padding-right: 124px;
+  }
+
+  .theme-picker {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    min-width: 112px;
+    min-height: 42px;
+    padding: 5px 7px;
+  }
+
+  .theme-picker-mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .theme-picker-copy small {
+    display: none;
+  }
+
+  .theme-picker select {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transitioning body,
+  .theme-transitioning .site-header,
+  .theme-transitioning .hero-section,
+  .theme-transitioning .artifact-card,
+  .theme-transitioning .exhibition-card,
+  .theme-transitioning .management-panel,
+  .theme-transitioning .artifact-dialog,
+  .theme-transitioning .theme-picker {
+    transition: none !important;
+  }
+}

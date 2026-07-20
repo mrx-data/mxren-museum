@@ -32,7 +32,8 @@ npm run migrate:artifact-images -- --dry-run
 - Browser-local managed artifacts remain as a read-only fallback when Supabase is unavailable or the schema has not been applied.
 - Local GSAP motion system in `src/museum-motion.ts` for ambient background, ordered home/featured/collection route entrances, pre-staged scroll reveal, filter refresh, and detail dialog animation.
 - Adaptive Canvas archive-dust atmosphere in `src/museum-canvas.ts`; it pauses when hidden and renders a static low-contrast frame for reduced-motion users.
-- Academia/Classical visual system based on dark wood, parchment, brass, typography, brass curator marks, arch-top framing, gradient light, and sepia-to-color interaction; category symbols are not rendered over uploaded covers.
+- Three persistent visitor-selectable visual systems: `暗金藏馆` keeps the classical dark-wood archive, `丹青卷宗` uses silk-paper texture, mineral color, ink particles, and a cinnabar collection seal, while `极夜观测所` uses cold-silver glass, coordinate grids, constellation Canvas links, and observation-window framing.
+- Theme selection is stored only in the current browser, applies before first paint, updates the browser theme color, and respects reduced-motion preferences. Category symbols are never rendered over uploaded covers.
 - No custom Node backend is required. Production deployment remains GitHub Pages.
 
 ## Supabase Persistence
@@ -108,8 +109,10 @@ If Supabase is not configured or the remote schema is unavailable, the app falls
 | `src/museum-export.ts` | Versioned metadata-only JSON export and browser download helper |
 | `src/main.ts` | Entry gate, catalog facets/sorting, exhibitions, trash/export management, and detail dialog |
 | `src/museum-motion.ts` | GSAP + ScrollTrigger motion timelines |
-| `src/museum-canvas.ts` | Responsive, reduced-motion-aware archive-dust Canvas background |
-| `src/styles.css` | Academia/Classical visual system and responsive layout |
+| `src/museum-canvas.ts` | Responsive, reduced-motion-aware theme Canvas for dust, ink fibers, and constellation links |
+| `src/museum-theme.ts` | Theme persistence, application, browser color, and accessible change announcements |
+| `src/styles.css` | Shared layout, components, and theme-aware color tokens |
+| `src/themes.css` | Theme picker plus the Academia, ink-scroll, and observatory visual systems |
 | `public/artifacts/` | User-provided `blackMyth.png` used by the remaining bundled artifact |
 | `docs/supabase-persistence.md` | Supabase setup, admin, verification, and failure-mode runbook |
 | `supabase/migrations/` | Postgres tables, RLS/RPC boundaries, custom admin sessions, catalog metadata, trash, exhibitions, and Storage policies |

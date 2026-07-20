@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./themes.css";
 import {
   artifacts as sampleArtifacts,
   categories as defaultCategories,
@@ -76,6 +77,7 @@ import {
   refreshMuseumScrollAnimations
 } from "./museum-motion";
 import { initMuseumCanvas } from "./museum-canvas";
+import { initMuseumTheme } from "./museum-theme";
 import { artifactStoragePaths, validateImageFile } from "./artifact-images";
 
 type FilterId = "all" | ArtifactCategory;
@@ -3536,6 +3538,7 @@ function updateCounts() {
 }
 
 function initMuseum() {
+  initMuseumTheme();
   initMuseumCanvas();
   renderArtifactCategoryOptions("games");
   updateCounts();

@@ -53,6 +53,8 @@ function assert(condition, message) {
   "src/museum-export.ts",
   "src/museum-import.ts",
   "src/museum-drafts.ts",
+  "src/museum-theme.ts",
+  "src/themes.css",
   "scripts/migrate-artifact-images.mjs",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
 ].forEach((file) => {
@@ -66,6 +68,9 @@ const main = read("src/main.ts");
 const css = read("src/styles.css");
 const readme = read("README.md");
 const motion = exists("src/museum-motion.ts") ? read("src/museum-motion.ts") : "";
+const canvas = exists("src/museum-canvas.ts") ? read("src/museum-canvas.ts") : "";
+const theme = exists("src/museum-theme.ts") ? read("src/museum-theme.ts") : "";
+const themeCss = exists("src/themes.css") ? read("src/themes.css") : "";
 const artifactStore = exists("src/artifact-store.ts") ? read("src/artifact-store.ts") : "";
 const supabaseClient = read("src/supabase-client.ts");
 const gitignore = exists(".gitignore") ? read(".gitignore") : "";
@@ -158,6 +163,19 @@ assert(html.includes("data-access-role=\"locked\""), "Missing default locked acc
 assert(html.includes("Cormorant+Garamond"), "Missing Cormorant Garamond font link");
 assert(html.includes("Crimson+Pro"), "Missing Crimson Pro font link");
 assert(html.includes("Cinzel"), "Missing Cinzel font link");
+assert(html.includes('id="museum-theme"'), "Missing museum theme selector");
+["academia", "scroll", "observatory"].forEach((themeId) => {
+  assert(html.includes(`value="${themeId}"`), `Missing museum theme option: ${themeId}`);
+  assert(themeCss.includes(`[data-theme="${themeId}"]`) || themeId === "academia", `Missing theme styles: ${themeId}`);
+});
+assert(main.includes("initMuseumTheme"), "Missing museum theme initialization");
+assert(theme.includes("MUSEUM_THEME_STORAGE_KEY"), "Missing persistent museum theme key");
+assert(theme.includes("museum-theme-change"), "Missing theme change event");
+assert(canvas.includes("currentCanvasTheme"), "Canvas must respond to active museum theme");
+assert(canvas.includes('activeTheme === "observatory"'), "Missing observatory constellation canvas");
+assert(canvas.includes('activeTheme === "scroll"'), "Missing scroll ink canvas treatment");
+assert(themeCss.includes("--background-rgb"), "Missing theme-aware RGB tokens");
+assert(themeCss.includes(".theme-picker"), "Missing theme picker styling");
 
 const itemCount = (collection.match(/\btitle: "/g) || []).length;
 assert(itemCount === 1, `Expected exactly 1 built-in artifact, found ${itemCount}`);

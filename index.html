@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="academia">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,11 +8,22 @@
       content="mxren-museum 是一个用于收藏游戏、风景与个人作品的私人数字藏馆。"
     />
     <title>mxren-museum | 私人数字藏馆</title>
+    <meta id="theme-color" name="theme-color" content="#1C1714" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("mxren-museum.theme.v1");
+          if (savedTheme === "academia" || savedTheme === "scroll" || savedTheme === "observatory") {
+            document.documentElement.dataset.theme = savedTheme;
+          }
+        } catch {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:wght@400;500;600&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:wght@400;500;600&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -79,6 +90,18 @@
           <a href="#manage" data-nav-route="manage" data-nav-target="manage">藏品管理</a>
           <a href="#notes" data-nav-route="home" data-nav-target="notes">策展原则</a>
         </nav>
+        <label class="theme-picker" for="museum-theme">
+          <span class="theme-picker-mark" aria-hidden="true">◈</span>
+          <span class="theme-picker-copy">
+            <small>Theme</small>
+            <select id="museum-theme" aria-label="选择藏馆主题">
+              <option value="academia">暗金藏馆</option>
+              <option value="scroll">丹青卷宗</option>
+              <option value="observatory">极夜观测所</option>
+            </select>
+          </span>
+          <span id="theme-status" class="visually-hidden" aria-live="polite"></span>
+        </label>
       </header>
 
       <main>
