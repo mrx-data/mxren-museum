@@ -90,18 +90,45 @@
           <a href="#manage" data-nav-route="manage" data-nav-target="manage">藏品管理</a>
           <a href="#notes" data-nav-route="home" data-nav-target="notes">策展原则</a>
         </nav>
-        <label class="theme-picker" for="museum-theme">
+        <div class="theme-picker" data-theme-picker>
           <span class="theme-picker-mark" aria-hidden="true">◈</span>
           <span class="theme-picker-copy">
             <small>Theme</small>
-            <select class="museum-select" id="museum-theme" aria-label="选择藏馆主题">
+            <button
+              class="theme-picker-trigger"
+              id="museum-theme-trigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="museum-theme-menu"
+            >
+              <span id="museum-theme-label">暗金藏馆</span>
+            </button>
+            <select class="museum-select" id="museum-theme" tabindex="-1" aria-hidden="true" hidden>
               <option value="academia">暗金藏馆</option>
               <option value="scroll">丹青卷宗</option>
               <option value="observatory">极夜观测所</option>
             </select>
           </span>
+          <div class="theme-picker-menu" id="museum-theme-menu" role="listbox" aria-label="选择藏馆主题" hidden>
+            <button class="theme-picker-option" type="button" role="option" data-theme-option="academia" aria-selected="true">
+              <span class="theme-option-mark" aria-hidden="true">◆</span>
+              <span class="theme-option-copy"><strong>暗金藏馆</strong><small>Academia archive</small></span>
+              <span class="theme-option-state" aria-hidden="true">已启用</span>
+            </button>
+            <button class="theme-picker-option" type="button" role="option" data-theme-option="scroll" aria-selected="false">
+              <span class="theme-option-mark" aria-hidden="true">印</span>
+              <span class="theme-option-copy"><strong>丹青卷宗</strong><small>Ink scroll</small></span>
+              <span class="theme-option-state" aria-hidden="true">选择</span>
+            </button>
+            <button class="theme-picker-option" type="button" role="option" data-theme-option="observatory" aria-selected="false">
+              <span class="theme-option-mark" aria-hidden="true">✦</span>
+              <span class="theme-option-copy"><strong>极夜观测所</strong><small>Night observatory</small></span>
+              <span class="theme-option-state" aria-hidden="true">选择</span>
+            </button>
+          </div>
           <span id="theme-status" class="visually-hidden" aria-live="polite"></span>
-        </label>
+        </div>
       </header>
 
       <main>

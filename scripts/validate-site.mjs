@@ -176,6 +176,12 @@ assert(canvas.includes('activeTheme === "observatory"'), "Missing observatory co
 assert(canvas.includes('activeTheme === "scroll"'), "Missing scroll ink canvas treatment");
 assert(themeCss.includes("--background-rgb"), "Missing theme-aware RGB tokens");
 assert(themeCss.includes(".theme-picker"), "Missing theme picker styling");
+assert(html.includes('id="museum-theme-trigger"'), "Missing custom theme menu trigger");
+assert(html.includes('id="museum-theme-menu"'), "Missing custom theme menu listbox");
+assert((html.match(/data-theme-option=/g) || []).length === 3, "Theme menu must expose all three custom options");
+assert(theme.includes('event.key === "ArrowDown"'), "Theme menu must support arrow-key navigation");
+assert(theme.includes('event.key === "Escape"'), "Theme menu must close with Escape");
+assert(themeCss.includes(".theme-picker-menu"), "Missing cross-browser custom theme menu styling");
 const selectCount = (html.match(/<select\b/g) || []).length;
 const themedSelectCount = (html.match(/<select\b[^>]*class="[^"]*\bmuseum-select\b[^"]*"/g) || []).length;
 assert(selectCount === themedSelectCount, "Every select must use the museum-select visual system");
