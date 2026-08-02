@@ -176,6 +176,11 @@ assert(canvas.includes('activeTheme === "observatory"'), "Missing observatory co
 assert(canvas.includes('activeTheme === "scroll"'), "Missing scroll ink canvas treatment");
 assert(themeCss.includes("--background-rgb"), "Missing theme-aware RGB tokens");
 assert(themeCss.includes(".theme-picker"), "Missing theme picker styling");
+const selectCount = (html.match(/<select\b/g) || []).length;
+const themedSelectCount = (html.match(/<select\b[^>]*class="[^"]*\bmuseum-select\b[^"]*"/g) || []).length;
+assert(selectCount === themedSelectCount, "Every select must use the museum-select visual system");
+assert(themeCss.includes("::picker(select)"), "Missing themed expanded select picker");
+assert(themeCss.includes("option::checkmark"), "Missing theme-specific select option marker");
 
 const itemCount = (collection.match(/\btitle: "/g) || []).length;
 assert(itemCount === 1, `Expected exactly 1 built-in artifact, found ${itemCount}`);

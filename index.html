@@ -94,7 +94,7 @@
           <span class="theme-picker-mark" aria-hidden="true">◈</span>
           <span class="theme-picker-copy">
             <small>Theme</small>
-            <select id="museum-theme" aria-label="选择藏馆主题">
+            <select class="museum-select" id="museum-theme" aria-label="选择藏馆主题">
               <option value="academia">暗金藏馆</option>
               <option value="scroll">丹青卷宗</option>
               <option value="observatory">极夜观测所</option>
@@ -190,13 +190,13 @@
             </div>
             <label class="catalog-select-field">
               <span>日期</span>
-              <select id="artifact-year-filter" aria-label="按年份筛选藏品">
+              <select class="museum-select" id="artifact-year-filter" aria-label="按年份筛选藏品">
                 <option value="">全部年份</option>
               </select>
             </label>
             <label class="catalog-select-field">
               <span>排序</span>
-              <select id="artifact-sort" aria-label="藏品排序方式">
+              <select class="museum-select" id="artifact-sort" aria-label="藏品排序方式">
                 <option value="catalog">馆藏顺序</option>
                 <option value="date-desc">日期由新到旧</option>
                 <option value="date-asc">日期由旧到新</option>
@@ -264,7 +264,7 @@
                 <div class="category-form-field">
                   <label for="artifact-form-category">类别</label>
                   <div class="category-select-row">
-                    <select id="artifact-form-category" name="category" required>
+                    <select class="museum-select" id="artifact-form-category" name="category" required>
                       <option value="games">游戏藏品</option>
                       <option value="landscapes">风景切片</option>
                       <option value="personal-works">个人作品</option>
@@ -392,7 +392,7 @@
                   <span>选择全部云端藏品</span>
                 </label>
                 <span id="artifact-batch-count">已选择 0 件</span>
-                <select id="artifact-batch-action" aria-label="批量操作">
+                <select class="museum-select" id="artifact-batch-action" aria-label="批量操作">
                   <option value="">选择批量操作</option>
                   <option value="visibility:published">设为已发布</option>
                   <option value="visibility:draft">设为草稿</option>
@@ -401,7 +401,7 @@
                   <option value="tags">替换标签</option>
                   <option value="trash">移入回收站</option>
                 </select>
-                <select id="artifact-batch-category" aria-label="批量修改类别" hidden></select>
+                <select class="museum-select" id="artifact-batch-category" aria-label="批量修改类别" hidden></select>
                 <input id="artifact-batch-tags" type="text" maxlength="320" placeholder="逗号分隔，最多 12 个标签" hidden />
                 <button class="button button-secondary" id="artifact-batch-apply" type="button" disabled>应用到所选藏品</button>
               </div>
@@ -547,7 +547,7 @@
           <div id="museum-import-warnings" class="museum-import-warnings" hidden></div>
           <label class="museum-import-strategy" for="museum-import-strategy">
             <span>遇到已存在的记录</span>
-            <select id="museum-import-strategy">
+            <select class="museum-select" id="museum-import-strategy">
               <option value="skip">保留当前版本，跳过冲突</option>
               <option value="overwrite">以备份版本覆盖当前记录</option>
             </select>

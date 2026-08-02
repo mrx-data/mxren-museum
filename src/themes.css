@@ -138,6 +138,213 @@
   background: var(--background-alt);
 }
 
+/* Native semantics, museum-specific surface: the right rail reads like a catalog drawer pull. */
+select.museum-select {
+  --select-surface: rgb(var(--background-rgb) / 0.72);
+  --select-surface-hover: rgb(var(--background-alt-rgb) / 0.92);
+  --select-picker-surface: rgb(var(--background-alt-rgb) / 0.985);
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 46px 10px 13px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.34);
+  border-radius: var(--radius);
+  outline: 0;
+  color: var(--foreground);
+  font: inherit;
+  line-height: 1.35;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--select-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%),
+    linear-gradient(
+      90deg,
+      transparent 0 calc(100% - 39px),
+      rgb(var(--accent-rgb) / 0.17) calc(100% - 39px) calc(100% - 38px),
+      rgb(var(--accent-rgb) / 0.045) calc(100% - 38px) 100%
+    );
+  background-repeat: no-repeat;
+  background-position:
+    calc(100% - 18px) calc(50% + 1px),
+    calc(100% - 13px) calc(50% + 1px),
+    0 0;
+  background-size: 5px 5px, 5px 5px, 100% 100%;
+  box-shadow: inset 0 1px 0 rgb(var(--foreground-rgb) / 0.035);
+  transition:
+    color 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+select.museum-select:hover:not(:disabled) {
+  border-color: rgb(var(--accent-rgb) / 0.68);
+  background-color: var(--select-surface-hover);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--foreground-rgb) / 0.055),
+    0 8px 22px rgb(var(--theme-shadow) / 0.12);
+}
+
+select.museum-select:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid rgb(var(--accent-rgb) / 0.82);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.11);
+}
+
+select.museum-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+select.museum-select option {
+  color: var(--foreground);
+  background: var(--background-alt);
+}
+
+.theme-picker select.museum-select {
+  min-height: 0;
+  padding: 0 27px 0 0;
+  border: 0;
+  outline: 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position:
+    calc(100% - 9px) calc(50% + 1px),
+    calc(100% - 4px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  box-shadow: none;
+}
+
+.theme-picker select.museum-select:hover,
+.theme-picker select.museum-select:focus-visible {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+/* Chromium's customizable Select API themes the expanded list; other browsers retain the styled native fallback above. */
+@supports (appearance: base-select) {
+  select.museum-select,
+  select.museum-select::picker(select) {
+    appearance: base-select;
+  }
+
+  select.museum-select {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0 calc(100% - 39px),
+      rgb(var(--accent-rgb) / 0.17) calc(100% - 39px) calc(100% - 38px),
+      rgb(var(--accent-rgb) / 0.045) calc(100% - 38px) 100%
+    );
+    background-position: 0 0;
+    background-size: 100% 100%;
+  }
+
+  .theme-picker select.museum-select {
+    background-image: none;
+  }
+
+  select.museum-select::picker-icon {
+    color: var(--accent);
+    transition: color 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  select.museum-select:open::picker-icon {
+    transform: rotate(180deg);
+  }
+
+  select.museum-select::picker(select) {
+    max-height: min(360px, 55vh);
+    margin-block-start: 8px;
+    padding: 6px;
+    overflow-y: auto;
+    border: 1px solid rgb(var(--accent-rgb) / 0.52);
+    border-radius: var(--radius);
+    color: var(--foreground);
+    background:
+      linear-gradient(135deg, rgb(var(--foreground-rgb) / 0.045), transparent 42%),
+      var(--select-picker-surface);
+    box-shadow:
+      inset 0 1px 0 rgb(var(--foreground-rgb) / 0.06),
+      0 22px 56px rgb(var(--theme-shadow) / 0.42);
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+    transform-origin: top center;
+    transition:
+      opacity 180ms ease,
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      display 260ms allow-discrete,
+      overlay 260ms allow-discrete;
+  }
+
+  select.museum-select:open::picker(select) {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  @starting-style {
+    select.museum-select:open::picker(select) {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.985);
+    }
+  }
+
+  select.museum-select option {
+    min-height: 40px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: max(1px, calc(var(--radius) - 1px));
+    color: var(--muted-foreground);
+    background: transparent;
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+  }
+
+  select.museum-select option + option {
+    border-top-color: rgb(var(--accent-rgb) / 0.1);
+  }
+
+  select.museum-select option:hover,
+  select.museum-select option:focus-visible {
+    color: var(--foreground);
+    border-color: rgb(var(--accent-rgb) / 0.26);
+    background: rgb(var(--accent-rgb) / 0.095);
+    outline: 0;
+  }
+
+  select.museum-select option:checked {
+    color: var(--foreground);
+    border-color: rgb(var(--accent-rgb) / 0.42);
+    background:
+      linear-gradient(90deg, rgb(var(--accent-rgb) / 0.18), transparent 72%),
+      rgb(var(--background-rgb) / 0.46);
+  }
+
+  select.museum-select option::checkmark {
+    content: "◆";
+    margin-inline-end: 9px;
+    color: var(--accent);
+    font-size: 9px;
+  }
+
+  :root[data-theme="scroll"] select.museum-select option::checkmark {
+    content: "印";
+    color: var(--accent-secondary);
+    font-family: "Songti SC", "STSong", serif;
+  }
+
+  :root[data-theme="observatory"] select.museum-select option::checkmark {
+    content: "✦";
+    text-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.55);
+  }
+}
+
 .theme-transitioning body,
 .theme-transitioning .site-header,
 .theme-transitioning .hero-section,
@@ -599,6 +806,13 @@
   .theme-transitioning .management-panel,
   .theme-transitioning .artifact-dialog,
   .theme-transitioning .theme-picker {
+    transition: none !important;
+  }
+
+  select.museum-select,
+  select.museum-select::picker-icon,
+  select.museum-select::picker(select),
+  select.museum-select option {
     transition: none !important;
   }
 }
