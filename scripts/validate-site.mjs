@@ -54,6 +54,7 @@ function assert(condition, message) {
   "src/museum-import.ts",
   "src/museum-drafts.ts",
   "src/museum-theme.ts",
+  "src/museum-select.ts",
   "src/themes.css",
   "scripts/migrate-artifact-images.mjs",
   "docs/superpowers/specs/2026-07-02-personal-digital-museum-design.md"
@@ -65,6 +66,7 @@ const pkg = JSON.parse(read("package.json"));
 const html = read("index.html");
 const collection = read("src/collection.ts");
 const main = read("src/main.ts");
+const museumSelect = read("src/museum-select.ts");
 const css = read("src/styles.css");
 const readme = read("README.md");
 const motion = exists("src/museum-motion.ts") ? read("src/museum-motion.ts") : "";
@@ -185,6 +187,12 @@ assert(themeCss.includes(".theme-picker-menu"), "Missing cross-browser custom th
 const selectCount = (html.match(/<select\b/g) || []).length;
 const themedSelectCount = (html.match(/<select\b[^>]*class="[^"]*\bmuseum-select\b[^"]*"/g) || []).length;
 assert(selectCount === themedSelectCount, "Every select must use the museum-select visual system");
+assert(main.includes("initMuseumSelects"), "Missing shared museum select initialization");
+assert(museumSelect.includes('select.id === "museum-theme"'), "Shared select enhancer must preserve the bespoke theme picker");
+assert(museumSelect.includes("MutationObserver"), "Shared select enhancer must follow dynamic option updates");
+assert(museumSelect.includes('event.key === "ArrowDown"'), "Shared select enhancer must support arrow-key navigation");
+assert(museumSelect.includes('event.key === "Escape"'), "Shared select enhancer must close with Escape");
+assert(themeCss.includes(".museum-select-control"), "Missing shared cross-browser select styling");
 assert(themeCss.includes("::picker(select)"), "Missing themed expanded select picker");
 assert(themeCss.includes("option::checkmark"), "Missing theme-specific select option marker");
 

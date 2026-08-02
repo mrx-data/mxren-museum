@@ -462,6 +462,240 @@ select.museum-select option {
   }
 }
 
+/* Cross-browser listbox: native selects remain the form source of truth but never open an OS menu. */
+.museum-select-control {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.museum-select-control[hidden] {
+  display: none !important;
+}
+
+select.museum-select-native {
+  display: none !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1px !important;
+  min-width: 0 !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.museum-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 48px 10px 13px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--accent-rgb) / 0.34);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  font: inherit;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 calc(100% - 39px),
+      rgb(var(--accent-rgb) / 0.17) calc(100% - 39px) calc(100% - 38px),
+      rgb(var(--accent-rgb) / 0.045) calc(100% - 38px) 100%
+    ),
+    rgb(var(--background-rgb) / 0.72);
+  box-shadow: inset 0 1px 0 rgb(var(--foreground-rgb) / 0.035);
+  transition: color 220ms ease, border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+}
+
+.museum-select-trigger::before,
+.museum-select-trigger::after {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-bottom: 1px solid var(--accent);
+  content: "";
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.museum-select-trigger::before {
+  right: 18px;
+  border-right: 1px solid var(--accent);
+  transform: translateY(-5px) rotate(45deg);
+}
+
+.museum-select-trigger::after {
+  right: 13px;
+  border-left: 1px solid var(--accent);
+  transform: translateY(-5px) rotate(-45deg);
+}
+
+.museum-select-control.is-open .museum-select-trigger::before {
+  transform: translateY(-1px) rotate(225deg);
+}
+
+.museum-select-control.is-open .museum-select-trigger::after {
+  transform: translateY(-1px) rotate(-225deg);
+}
+
+.museum-select-trigger:hover:not(:disabled) {
+  border-color: rgb(var(--accent-rgb) / 0.68);
+  background-color: rgb(var(--background-alt-rgb) / 0.92);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--foreground-rgb) / 0.055),
+    0 8px 22px rgb(var(--theme-shadow) / 0.12);
+}
+
+.museum-select-trigger:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid rgb(var(--accent-rgb) / 0.82);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.11);
+}
+
+.museum-select-trigger[aria-invalid="true"] {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 4px rgb(var(--secondary-rgb) / 0.12);
+}
+
+.museum-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.museum-select-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.museum-select-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 90;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(360px, calc(100vw - 32px));
+  max-height: min(360px, 55vh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid rgb(var(--accent-rgb) / 0.54);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background:
+    linear-gradient(135deg, rgb(var(--foreground-rgb) / 0.05), transparent 42%),
+    rgb(var(--background-alt-rgb) / 0.99);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--foreground-rgb) / 0.065),
+    0 22px 56px rgb(var(--theme-shadow) / 0.42);
+  animation: theme-menu-reveal 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.museum-select-menu[hidden] {
+  display: none;
+}
+
+.museum-select-control.align-end .museum-select-menu {
+  right: 0;
+  left: auto;
+}
+
+.museum-select-control.opens-up .museum-select-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform-origin: bottom center;
+}
+
+.museum-select-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: max(1px, calc(var(--radius) - 1px));
+  color: var(--muted-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.museum-select-option + .museum-select-option {
+  border-top-color: rgb(var(--accent-rgb) / 0.1);
+}
+
+.museum-select-option:hover,
+.museum-select-option:focus-visible {
+  color: var(--foreground);
+  border-color: rgb(var(--accent-rgb) / 0.28);
+  outline: 0;
+  background: rgb(var(--accent-rgb) / 0.095);
+  transform: translateX(2px);
+}
+
+.museum-select-option[aria-selected="true"] {
+  color: var(--foreground);
+  border-color: rgb(var(--accent-rgb) / 0.42);
+  background:
+    linear-gradient(90deg, rgb(var(--accent-rgb) / 0.18), transparent 74%),
+    rgb(var(--background-rgb) / 0.44);
+}
+
+.museum-select-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.museum-select-option-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
+  color: var(--accent);
+  font-size: 8px;
+}
+
+:root[data-theme="scroll"] .museum-select-option-mark {
+  color: var(--accent-secondary);
+  font-family: "Songti SC", "STSong", serif;
+}
+
+:root[data-theme="observatory"] .museum-select-option-mark {
+  border-radius: 50%;
+  text-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.58);
+}
+
+.museum-select-option-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.museum-select-option-status {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .theme-transitioning body,
 .theme-transitioning .site-header,
 .theme-transitioning .hero-section,
@@ -935,11 +1169,16 @@ select.museum-select option {
   select.museum-select::picker(select),
   select.museum-select option,
   .theme-picker-trigger::after,
-  .theme-picker-option {
+  .theme-picker-option,
+  .museum-select-trigger,
+  .museum-select-trigger::before,
+  .museum-select-trigger::after,
+  .museum-select-option {
     transition: none !important;
   }
 
-  .theme-picker-menu {
+  .theme-picker-menu,
+  .museum-select-menu {
     animation: none !important;
   }
 }

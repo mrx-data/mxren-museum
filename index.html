@@ -291,7 +291,7 @@
                 <div class="category-form-field">
                   <label for="artifact-form-category">类别</label>
                   <div class="category-select-row">
-                    <select class="museum-select" id="artifact-form-category" name="category" required>
+                    <select class="museum-select" id="artifact-form-category" name="category" aria-label="选择藏品类别" required>
                       <option value="games">游戏藏品</option>
                       <option value="landscapes">风景切片</option>
                       <option value="personal-works">个人作品</option>
@@ -574,7 +574,7 @@
           <div id="museum-import-warnings" class="museum-import-warnings" hidden></div>
           <label class="museum-import-strategy" for="museum-import-strategy">
             <span>遇到已存在的记录</span>
-            <select class="museum-select" id="museum-import-strategy">
+            <select class="museum-select" id="museum-import-strategy" aria-label="选择导入冲突处理方式">
               <option value="skip">保留当前版本，跳过冲突</option>
               <option value="overwrite">以备份版本覆盖当前记录</option>
             </select>
